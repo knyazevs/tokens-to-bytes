@@ -1,0 +1,968 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Калькулятор · tokens→bytes</title>
+  <meta name="description" content="Один калькулятор, пять wasm-реализаций: ручной байткод, Rust, AssemblyScript, C и C++.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2315171c'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='15' fill='%23f59e0b' text-anchor='middle'%3E%E2%86%92%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      color-scheme: dark;
+
+      --bg: #111318;
+      --bg-a: #1b2432;
+      --bg-b: #2a2118;
+
+      --panel: #1e222a;
+      --panel-2: #262b35;
+      --edge: #353c49;
+
+      --text: #f3f5f7;
+      --muted: #98a2b3;
+
+      --screen: #0d1015;
+      --screen-2: #11151c;
+      --screen-hover: #3d495d;
+
+      --num: #2b313d;
+      --num-hi: #353c4b;
+      --fn: #3a2e28;
+      --fn-hi: #48372f;
+      --op: #3a351f;
+      --op-hi: #4a4427;
+      --op-active: #5c5024;
+      --eq: #d97706;
+      --eq-hi: #f59e0b;
+      --err: #f87171;
+
+      --toast: #f3f4f6;
+      --toast-text: #15171c;
+
+      --shadow: 0 24px 70px rgba(0, 0, 0, 0.5);
+    }
+
+    :root[data-theme="light"] {
+      color-scheme: light;
+
+      --bg: #eef1f6;
+      --bg-a: #dbe6f8;
+      --bg-b: #f7e7cf;
+
+      --panel: #ffffff;
+      --panel-2: #f1f4f9;
+      --edge: #dce1ea;
+
+      --text: #1d2430;
+      --muted: #6b7482;
+
+      --screen: #f8fafc;
+      --screen-2: #eef2f8;
+      --screen-hover: #b9c4d4;
+
+      --num: #eef1f6;
+      --num-hi: #e1e7f0;
+      --fn: #f5ece5;
+      --fn-hi: #ebded1;
+      --op: #fbf3d9;
+      --op-hi: #f5e8bd;
+      --op-active: #f4dda2;
+      --eq: #e88912;
+      --eq-hi: #f6a12b;
+      --err: #c73636;
+
+      --toast: #1f2937;
+      --toast-text: #f9fafb;
+
+      --shadow: 0 20px 50px rgba(31, 41, 55, 0.16);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: var(--text);
+      font-family: "Segoe UI", Inter, Tahoma, Geneva, sans-serif;
+      background:
+        radial-gradient(1000px 520px at 12% -5%, var(--bg-a) 0%, transparent 62%),
+        radial-gradient(820px 460px at 100% 105%, var(--bg-b) 0%, transparent 58%),
+        var(--bg);
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    .calc {
+      position: relative;
+      width: min(100%, 372px);
+      padding: 18px;
+      border: 1px solid var(--edge);
+      border-radius: 24px;
+      background: linear-gradient(180deg, var(--panel-2) 0%, var(--panel) 100%);
+      box-shadow:
+        var(--shadow),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    }
+
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border: 1px solid #2b4268;
+      border-radius: 999px;
+      background: #1a2538;
+      color: #93c5fd;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+    }
+
+    :root[data-theme="light"] .badge {
+      background: #e6efff;
+      color: #2563eb;
+      border-color: #bfd4f7;
+    }
+
+    .tagline {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.01em;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .icon-btn {
+      width: 30px;
+      height: 30px;
+      text-decoration: none;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--edge);
+      border-radius: 9px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font-size: 16px;
+      cursor: pointer;
+      transition: color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    }
+    .icon-btn:hover { color: var(--text); border-color: var(--eq); }
+    .icon-btn:active { transform: scale(0.94); }
+
+    .engines {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-bottom: 10px;
+    }
+
+    .engines button {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border: 1px solid var(--edge);
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font: inherit;
+      font-size: 10.5px;
+      cursor: pointer;
+      transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+    }
+    .engines button:hover { color: var(--text); border-color: var(--eq); }
+    .engines button[aria-pressed="true"] {
+      border-color: var(--eq);
+      color: var(--text);
+      background: var(--op-active);
+    }
+    .engines .edot {
+      width: 5px;
+      height: 5px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .screen {
+      position: relative;
+      min-height: 112px;
+      margin-bottom: 14px;
+      padding: 14px 44px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 4px;
+      text-align: right;
+      border: 1px solid var(--edge);
+      border-radius: 16px;
+      background: linear-gradient(180deg, var(--screen-2) 0%, var(--screen) 100%);
+      cursor: copy;
+      overflow: hidden;
+      transition: border-color 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .screen:hover { border-color: var(--screen-hover); }
+
+    .screen.is-error {
+      border-color: var(--err);
+      box-shadow: inset 0 0 26px rgba(248, 113, 113, 0.09);
+    }
+
+    .expr {
+      min-height: 20px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .value-row {
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-end;
+      min-width: 0;
+      gap: 8px;
+    }
+
+    .value {
+      min-width: 0;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+      line-height: 1.05;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-size: 44px;
+      transition: font-size 0.12s ease;
+    }
+
+    .value[data-len="m"]  { font-size: 36px; }
+    .value[data-len="l"]  { font-size: 29px; }
+    .value[data-len="xl"] { font-size: 23px; }
+
+    .value.err {
+      font-size: 32px;
+      color: var(--err);
+    }
+
+    .bump { animation: bump 0.18s ease-out; }
+
+    @keyframes bump {
+      from { transform: translateY(2px) scale(0.985); opacity: 0.65; }
+      to   { transform: none; opacity: 1; }
+    }
+
+    .copy {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
+      font-size: 15px;
+      cursor: copy;
+      opacity: 0.55;
+      transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+    }
+
+    .screen:hover .copy,
+    .copy:focus-visible { opacity: 1; }
+
+    .copy:hover {
+      color: var(--text);
+      background: var(--panel-2);
+      border-color: var(--edge);
+    }
+
+    .keys {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 9px;
+    }
+
+    .key {
+      position: relative;
+      min-height: 54px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      overflow: hidden;
+      appearance: none;
+      border: 1px solid #3a4252;
+      border-radius: 13px;
+      background: var(--num);
+      color: var(--text);
+      font: inherit;
+      font-size: 20px;
+      font-weight: 600;
+      cursor: pointer;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      transition:
+        transform 0.06s ease,
+        background 0.14s ease,
+        border-color 0.14s ease,
+        box-shadow 0.14s ease;
+    }
+
+    :root[data-theme="light"] .key { border-color: #d4dae4; }
+
+    .key::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        circle at var(--x, 50%) var(--y, 50%),
+        rgba(255, 255, 255, 0.22) 0%,
+        transparent 58%
+      );
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+    }
+
+    .key:active::after,
+    .key.pressed::after { opacity: 1; transition: none; }
+
+    .key:hover { background: var(--num-hi); }
+    .key:active,
+    .key.pressed { transform: translateY(1px) scale(0.985); }
+
+    .key.fn {
+      background: var(--fn);
+      border-color: #544238;
+      font-size: 17px;
+    }
+    .key.fn:hover { background: var(--fn-hi); }
+
+    .key.op {
+      background: var(--op);
+      border-color: #564e2f;
+      font-size: 22px;
+    }
+    .key.op:hover { background: var(--op-hi); }
+
+    .key.op.active {
+      background: var(--op-active);
+      border-color: var(--eq);
+      box-shadow:
+        0 0 0 1px rgba(245, 158, 11, 0.28),
+        inset 0 0 18px rgba(245, 158, 11, 0.12);
+    }
+
+    .key.eq {
+      background: var(--eq);
+      border-color: var(--eq-hi);
+      color: #1a1206;
+      font-size: 24px;
+    }
+    .key.eq:hover { background: var(--eq-hi); }
+
+    :root[data-theme="light"] .key.op.active { color: #8a5203; }
+
+    .key:focus-visible,
+    .icon-btn:focus-visible,
+    .chip:focus-visible,
+    .copy:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: 2px;
+    }
+
+    .history {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 26px;
+      margin-top: 12px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .history::-webkit-scrollbar { display: none; }
+
+    .history-empty {
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .chip {
+      flex: 0 0 auto;
+      padding: 4px 9px;
+      border: 1px solid var(--edge);
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: var(--muted);
+      font: inherit;
+      font-size: 11px;
+      white-space: nowrap;
+      cursor: copy;
+      transition: color 0.14s ease, border-color 0.14s ease;
+    }
+    .chip:hover {
+      color: var(--text);
+      border-color: var(--eq);
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      min-height: 18px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+    }
+
+    .dot {
+      width: 6px;
+      height: 6px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      top: 54px;
+      z-index: 5;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--toast);
+      color: var(--toast-text);
+      font-size: 12px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, -8px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 400px) {
+      body { padding: 12px; }
+      .calc { padding: 14px; border-radius: 20px; }
+      .key { min-height: 48px; font-size: 18px; }
+      .value[data-len="s"] { font-size: 38px; }
+      .tagline { font-size: 11px; }
+    }
+
+    @media (max-height: 700px) {
+      body { padding: 12px; }
+      .key { min-height: 46px; }
+      .screen { min-height: 96px; }
+      .history { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    .about {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--edge);
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .about summary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      cursor: pointer;
+      list-style: none;
+      user-select: none;
+    }
+    .about summary::-webkit-details-marker { display: none; }
+    .about summary::before {
+      content: "\25B8";
+      transition: transform 0.15s ease;
+    }
+    .about[open] summary::before { transform: rotate(90deg); }
+    .about summary:hover { color: var(--text); }
+
+    .about-body {
+      margin-top: 8px;
+      max-height: 210px;
+      overflow: auto;
+      line-height: 1.5;
+      scrollbar-width: thin;
+    }
+    .about-body h3 {
+      margin: 10px 0 4px;
+      color: var(--text);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .about-body p,
+    .about-body ul { margin: 4px 0; }
+    .about-body ul { padding-left: 16px; }
+    .about-body code {
+      font-family: ui-monospace, Consolas, "Courier New", monospace;
+      color: var(--text);
+    }
+    .size-table {
+      width: 100%;
+      margin-top: 5px;
+      border-collapse: collapse;
+      font-variant-numeric: tabular-nums;
+    }
+    .size-table th,
+    .size-table td {
+      padding: 3px 4px;
+      border-bottom: 1px solid var(--edge);
+      text-align: right;
+    }
+    .size-table th:first-child,
+    .size-table td:first-child { text-align: left; }
+    .size-table th {
+      color: var(--text);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <main class="calc">
+    <header class="top">
+      <div class="brand">
+        <span class="badge">WASM</span>
+        <span class="tagline">один API · пять реализаций</span>
+      </div>
+      <div class="actions">
+        <a class="icon-btn" href="bench.html" aria-label="Бенчмарк проекта" title="Бенчмарк проекта">▤</a>
+        <a class="icon-btn" href="../../index.html" aria-label="К статье" title="К статье">←</a>
+        <button id="theme" class="icon-btn" type="button" aria-label="Переключить тему" title="Сменить тему">◐</button>
+      </div>
+    </header>
+
+    <div class="engines" id="engines" role="group" aria-label="Реализация wasm"></div>
+
+    <section id="screen" class="screen" aria-live="polite" aria-atomic="true" title="Нажмите, чтобы скопировать результат">
+      <div id="expr" class="expr">&nbsp;</div>
+      <div class="value-row">
+        <div id="value" class="value" data-len="s">0</div>
+        <button id="copy" class="copy" type="button" aria-label="Скопировать результат" title="Скопировать (Ctrl+C)">⧉</button>
+      </div>
+    </section>
+
+    <div class="keys" role="group" aria-label="Кнопки калькулятора">
+      <button class="key fn" type="button" data-action="clear" title="Сбросить всё (Esc)">C</button>
+      <button class="key fn" type="button" data-action="ce" title="Очистить ввод (Delete)">CE</button>
+      <button class="key fn" type="button" data-action="back" aria-label="Удалить последний символ" title="Удалить последний символ (Backspace)">⌫</button>
+      <button class="key op" type="button" data-op="4" aria-label="Деление" title="Деление ( / )">÷</button>
+
+      <button class="key" type="button" data-digit="7">7</button>
+      <button class="key" type="button" data-digit="8">8</button>
+      <button class="key" type="button" data-digit="9">9</button>
+      <button class="key op" type="button" data-op="3" aria-label="Умножение" title="Умножение ( * )">×</button>
+
+      <button class="key" type="button" data-digit="4">4</button>
+      <button class="key" type="button" data-digit="5">5</button>
+      <button class="key" type="button" data-digit="6">6</button>
+      <button class="key op" type="button" data-op="2" aria-label="Вычитание" title="Вычитание ( - )">−</button>
+
+      <button class="key" type="button" data-digit="1">1</button>
+      <button class="key" type="button" data-digit="2">2</button>
+      <button class="key" type="button" data-digit="3">3</button>
+      <button class="key op" type="button" data-op="1" aria-label="Сложение" title="Сложение ( + )">+</button>
+
+      <button class="key fn" type="button" data-action="neg" aria-label="Сменить знак" title="Сменить знак (N)">±</button>
+      <button class="key" type="button" data-digit="0">0</button>
+      <button class="key" type="button" data-action="dot" aria-label="Десятичная точка" title="Десятичная точка ( . или , )">.</button>
+      <button class="key eq" type="button" data-action="eq" aria-label="Равно" title="Равно (Enter)">=</button>
+    </div>
+
+    <div id="history" class="history" aria-label="История вычислений"></div>
+
+    <footer class="status">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="statusText">загрузка calc.wasm…</span>
+    </footer>
+
+    <details class="about">
+      <summary>README · как это устроено</summary>
+      <div class="about-body">
+        <h3>Что здесь происходит</h3>
+        <p>Интерфейс не знает, на каком языке написана логика: он вызывает 17 экспортов, а состояние ввода, дроби, backspace, смена знака, цепочки операций и повтор <code>=</code> живут внутри wasm. Переключатель сверху меняет модуль, не меняя ни одной строки UI-кода.</p>
+
+        <h3>Реализации</h3>
+        <ul>
+          <li><code>calc.wasm</code> — ручной байткод (<code>calc.wat</code> — его текстовая форма);</li>
+          <li><code>calc-rust.wasm</code>, <code>calc-assemblyscript.wasm</code>, <code>calc-c.wasm</code>, <code>calc-cpp.wasm</code> — сборки из Rust / AssemblyScript / C / C++.</li>
+        </ul>
+
+        <h3>Запуск</h3>
+        <p>Страница открывается двойным щелчком: для ручной сборки в HTML встроена base64-копия, поэтому <code>file://</code> работает без сервера. Остальные движки загружаются через <code>fetch</code> — для них нужен локальный сервер, например <code>python -m http.server</code>.</p>
+
+        <h3>Экспорты</h3>
+        <p><code>digit(i32)</code>, <code>dot()</code>, <code>back()</code>, <code>neg()</code>, <code>op(i32)</code>, <code>equals()</code>, <code>clear()</code>, <code>ce()</code>, <code>display() → f64</code>, <code>acc() → f64</code>, <code>cur() → f64</code>, <code>opCode() → i32</code>, <code>lastOp() → i32</code>, <code>fresh() → i32</code>, <code>error() → i32</code>, <code>operand() → f64</code>, <code>leftOperand() → f64</code>.</p>
+        <p>Коды операций: <code>1 = +</code>, <code>2 = −</code>, <code>3 = ×</code>, <code>4 = ÷</code>. Подробности и измерения — в <a href="../../index.html" style="color:inherit">статье</a>.</p>
+      </div>
+    </details>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <!-- Резервная копия того же байткода: чтобы index.html работал и через file:// -->
+  <script id="wasm-b64" type="application/octet-stream">AGFzbQEAAAABEARgAAF8YAABf2AAAGABfwADFRQCAgICAwICAgIDAgAAAAEBAQEAAAZnDHwBRAAAAAAAAAAAC3wBRAAAAAAAAAAAC3wBRAAAAAAAAPA/C3wBRAAAAAAAAAAAC38BQQALfwFBAAt/AUEBC38BQQALfwFBAAt/AUEAC3wBRAAAAAAAAAAAC3wBRAAAAAAAAAAACweHAREFY2xlYXIAAQJjZQACBWRpZ2l0AAQDZG90AAUEYmFjawAGA25lZwAHAm9wAAkGZXF1YWxzAAoHZGlzcGxheQALA2FjYwAMA2N1cgANBm9wQ29kZQAOBWVycm9yAA8FZnJlc2gAEAZsYXN0T3AAEQdvcGVyYW5kABILbGVmdE9wZXJhbmQAEwrUBhQvAEQAAAAAAAAAACQBRAAAAAAAAPA/JAJEAAAAAAAAAAAkA0EBJAZBACQHQQAkCAsxABAARAAAAAAAAAAAJABBACQEQQAkBUEAJAlEAAAAAAAAAAAkCkQAAAAAAAAAACQLCwgAEABBACQJC0sBAnwjASMCo5lEldYm6AsuET6gnSEAIAAgAEQAAAAAAAAkQKOdRAAAAAAAACRAoqEhASMBRAAAAAAAAAAAYwRAIAGaIQELIAEkAwuHAQECfCMJBEAQAQsjBgRAEABBACQGCyAAtyEBRAAAAAAAAPC/RAAAAAAAAPA/IwFEAAAAAAAAAABjGyECIwcEQCMCRAAAAAAAACRAoyQCIwEgASMCoiACoqAkASMIQQFqJAgFIwFEAAAAAAAAJECiIAEgAqKgJAFEAAAAAAAA8D8kAgsgASQDCx4AIwkEQBABCyMGBEAQAEEAJAYLIwdFBEBBASQHCwuFAQAjCQRAEAEPCyMGBEAPCyMHBEAjCEUEQEEAJAcPCwsjBwRAIwEjAyMCoqEkASMCRAAAAAAAACRAoiQCIwhBAWskCCMIBEAQAwVBACQHRAAAAAAAAPA/JAIQAwsFIwEjA6FEAAAAAAAAJECjnSQBEAMjAUQAAAAAAAAAAGEEQEEBJAYLCwsfACMJBEAQAQ8LIwYjBHEEQCMAmiQABSMBmiQBEAMLC2UAIwRBAUYEQCMAIwGgJAAFIwRBAkYEQCMAIwGhJAAFIwRBA0YEQCMAIwGiJAAFIwRBBEYEQCMBRAAAAAAAAAAAYQRAQQEkCUQAAAAAAAAAACQABSMAIwGjJAALBSMBJAALCwsLC00AIwkEQBABCyMEBEAjBkUEQBAIIwAkAQsFIwEkAAsgACQFIAAkBEEBJAZBACQHQQAkCEQAAAAAAADwPyQCRAAAAAAAAAAAJANBACQJC2AAIwkEQA8LIwRFBEAjBSMGcQRAIwUkBCMKJAELCyMEBEAjACQLIwEkChAIIwAkASMEJAVBACQEQQEkBkEAJAdBACQIRAAAAAAAAPA/JAJEAAAAAAAAAAAkAwVBASQGCwsPACMEIwZxBHwjAAUjAQsLBAAjAAsEACMBCwQAIwQLBAAjCQsEACMGCwQAIwULBAAjCgsEACMLCw==</script>
+
+  <script type="module">
+    const $ = (sel) => document.querySelector(sel);
+    const screenEl = $('#screen');
+    const valueEl = $('#value');
+    const exprEl = $('#expr');
+    const statusEl = $('#statusText');
+    const historyEl = $('#history');
+    const toastEl = $('#toast');
+
+    const ENGINES = [
+      { id: 'manual', name: 'Ручной', file: 'calc.wasm', tone: '#60a5fa' },
+      { id: 'rust', name: 'Rust', file: 'calc-rust.wasm', tone: '#f59e0b' },
+      { id: 'as', name: 'AssemblyScript', file: 'calc-assemblyscript.wasm', tone: '#34d399' },
+      { id: 'c', name: 'C', file: 'calc-c.wasm', tone: '#a78bfa' },
+      { id: 'cpp', name: 'C++', file: 'calc-cpp.wasm', tone: '#f472b6' },
+    ];
+
+    const requested = new URLSearchParams(location.search).get('engine');
+    let current = ENGINES.find((e) => e.file === requested) ?? ENGINES[0];
+    let w = null;
+
+    function inlineBytes() {
+      const b64 = $('#wasm-b64').textContent.replace(/\s/g, '');
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes.buffer;
+    }
+
+    async function loadEngine(engine) {
+      let buf;
+      let inline = false;
+      try {
+        const res = await fetch(engine.file, { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        buf = await res.arrayBuffer();
+      } catch {
+        if (engine.id !== 'manual') throw new Error(`не удалось загрузить ${engine.file}`);
+        inline = true;
+        buf = inlineBytes();
+      }
+      const { instance } = await WebAssembly.instantiate(buf);
+      return { exports: instance.exports, size: buf.byteLength, inline };
+    }
+
+    function renderEngines(activeId) {
+      const wrap = $('#engines');
+      wrap.replaceChildren();
+      for (const engine of ENGINES) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.engine = engine.id;
+        btn.setAttribute('aria-pressed', engine.id === activeId ? 'true' : 'false');
+        const dot = document.createElement('span');
+        dot.className = 'edot';
+        dot.style.background = engine.tone;
+        btn.append(dot, document.createTextNode(engine.name));
+        btn.addEventListener('click', () => {
+          if (engine.id !== current.id) selectEngine(engine);
+        });
+        wrap.appendChild(btn);
+      }
+    }
+
+    async function selectEngine(engine) {
+      renderEngines(engine.id);
+      statusEl.textContent = `загрузка ${engine.file}…`;
+      try {
+        const loaded = await loadEngine(engine);
+        w = loaded.exports;
+        current = engine;
+        const url = new URL(location.href);
+        if (engine.id === 'manual') url.searchParams.delete('engine');
+        else url.searchParams.set('engine', engine.file);
+        try { history.replaceState(null, '', url); } catch { /* file:// */ }
+        statusEl.textContent = `${engine.file} · ${loaded.size} Б${loaded.inline ? ' · inline' : ''} · Ctrl+C — копировать`;
+        render();
+      } catch (err) {
+        w = null;
+        renderEngines(current.id);
+        statusEl.textContent = err.message + ' · нужен локальный сервер';
+        valueEl.textContent = '—';
+        exprEl.textContent = 'движок недоступен';
+        valueEl.classList.remove('err');
+        setActiveOp(0);
+      }
+    }
+
+    const SYM = { 0: '', 1: '+', 2: '−', 3: '×', 4: '÷' };
+
+    function raw(n) {
+      if (!Number.isFinite(n)) return '';
+      if (Object.is(n, -0)) n = 0;
+      return String(Number(n.toPrecision(15)));
+    }
+
+    function fmt(n) {
+      if (!Number.isFinite(n)) return '∞';
+      if (Object.is(n, -0)) n = 0;
+      let s = Number(n.toPrecision(12)).toString();
+      if (s.includes('e')) {
+        const [mant, exp] = s.split('e');
+        s = `${mant}e${exp.replace('+', '')}`;
+      }
+      return s;
+    }
+
+    let toastTimer;
+    function showToast(message) {
+      toastEl.textContent = message;
+      toastEl.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastEl.classList.remove('show'), 1400);
+    }
+
+    async function copyText(text, message = 'Скопировано') {
+      if (!text) return;
+      try {
+        if (!navigator.clipboard) throw new Error('no clipboard api');
+        await navigator.clipboard.writeText(text);
+      } catch {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+        } catch {
+          showToast('Не удалось скопировать');
+          return;
+        }
+      }
+      showToast(message);
+    }
+
+    function setActiveOp(code) {
+      document.querySelectorAll('.key.op').forEach((btn) => {
+        const on = Number(btn.dataset.op) === code;
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      });
+    }
+
+    function bump() {
+      valueEl.classList.remove('bump');
+      void valueEl.offsetWidth;
+      valueEl.classList.add('bump');
+    }
+
+    function render() {
+      if (!w) return;
+      const failed = !!w.error();
+      screenEl.classList.toggle('is-error', failed);
+
+      if (failed) {
+        valueEl.textContent = 'Error';
+        valueEl.dataset.len = 's';
+        valueEl.classList.add('err');
+        exprEl.textContent = 'деление на ноль · C — сброс';
+        setActiveOp(0);
+        return;
+      }
+
+      valueEl.classList.remove('err');
+      const text = fmt(w.display());
+      if (valueEl.textContent !== text) bump();
+      valueEl.textContent = text;
+
+      const digits = text.replace(/[-+eE.]/g, '').length;
+      valueEl.dataset.len = digits <= 7 ? 's' : digits <= 10 ? 'm' : digits <= 13 ? 'l' : 'xl';
+
+      const op = w.opCode();
+      const last = w.lastOp();
+      const fresh = w.fresh();
+      if (op) {
+        exprEl.textContent = fresh
+          ? `${fmt(w.acc())} ${SYM[op]}`
+          : `${fmt(w.acc())} ${SYM[op]} ${fmt(w.cur())}`;
+      } else if (last && fresh) {
+        exprEl.textContent = `${fmt(w.leftOperand())} ${SYM[last]} ${fmt(w.operand())} =`;
+      } else {
+        exprEl.textContent = '\u00a0';
+      }
+      setActiveOp(op);
+    }
+
+    const history = [];
+
+    function expressionForEquals() {
+      const op = w.opCode();
+      const last = w.lastOp();
+      if (op) return `${fmt(w.acc())} ${SYM[op]} ${fmt(w.cur())}`;
+      if (last && w.fresh()) return `${fmt(w.acc())} ${SYM[last]} ${fmt(w.operand())}`;
+      return '';
+    }
+
+    function renderHistory() {
+      historyEl.replaceChildren();
+      if (!history.length) {
+        const empty = document.createElement('span');
+        empty.className = 'history-empty';
+        empty.textContent = 'история появится после первого =';
+        historyEl.appendChild(empty);
+        return;
+      }
+      history.forEach((item) => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'chip';
+        chip.title = 'Скопировать результат';
+        chip.setAttribute('aria-label', `Скопировать ${item.result}`);
+        chip.textContent = `${item.expr} = ${item.result}`;
+        chip.addEventListener('click', () => copyText(item.raw, 'Результат скопирован'));
+        historyEl.appendChild(chip);
+      });
+    }
+
+    function pushHistory(expr, result, value) {
+      history.unshift({ expr, result, raw: value });
+      if (history.length > 4) history.length = 4;
+      renderHistory();
+    }
+
+    function act(btn, event) {
+      if (!btn || !w) return;
+
+      if (event) {
+        const rect = btn.getBoundingClientRect();
+        btn.style.setProperty('--x', `${event.clientX - rect.left}px`);
+        btn.style.setProperty('--y', `${event.clientY - rect.top}px`);
+      }
+
+      if (btn.dataset.digit !== undefined) w.digit(Number(btn.dataset.digit));
+      else if (btn.dataset.op !== undefined) w.op(Number(btn.dataset.op));
+      else {
+        switch (btn.dataset.action) {
+          case 'clear': w.clear(); break;
+          case 'ce': w.ce(); break;
+          case 'back': w.back(); break;
+          case 'neg': w.neg(); break;
+          case 'dot': w.dot(); break;
+          case 'eq': {
+            const expr = expressionForEquals();
+            const hasCalculation = !!expr;
+            w.equals();
+            if (hasCalculation && !w.error()) {
+              pushHistory(expr, fmt(w.display()), raw(w.display()));
+            }
+            break;
+          }
+        }
+      }
+
+      btn.classList.add('pressed');
+      setTimeout(() => btn.classList.remove('pressed'), 90);
+    }
+
+    $('.keys').addEventListener('click', (e) => {
+      const btn = e.target.closest('button');
+      if (!btn) return;
+      act(btn, e);
+      render();
+    });
+
+    try {
+      const saved = localStorage.getItem('wasm-calc-theme');
+      if (saved === 'light' || saved === 'dark') document.documentElement.dataset.theme = saved;
+    } catch { /* file:// может запрещать localStorage */ }
+
+    $('#theme').addEventListener('click', () => {
+      const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+      document.documentElement.dataset.theme = next;
+      try { localStorage.setItem('wasm-calc-theme', next); } catch { /* ignore */ }
+      showToast(next === 'light' ? 'Светлая тема' : 'Тёмная тема');
+    });
+
+    $('#copy').addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!w) return;
+      copyText(raw(w.display()), 'Результат скопирован');
+    });
+    screenEl.addEventListener('click', () => {
+      if (!w || w.error()) return;
+      copyText(raw(w.display()), 'Результат скопирован');
+    });
+
+    const KEY_MAP = {
+      '*': '[data-op="3"]', 'x': '[data-op="3"]', 'X': '[data-op="3"]',
+      '/': '[data-op="4"]', '-': '[data-op="2"]', '+': '[data-op="1"]',
+      '.': '[data-action="dot"]', ',': '[data-action="dot"]',
+      'Enter': '[data-action="eq"]', '=': '[data-action="eq"]',
+      'Escape': '[data-action="clear"]', 'Delete': '[data-action="ce"]',
+      'Backspace': '[data-action="back"]', 'n': '[data-action="neg"]',
+      'N': '[data-action="neg"]'
+    };
+
+    window.addEventListener('keydown', (e) => {
+      if (!w) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+        if (window.getSelection()?.toString()) return;
+        e.preventDefault();
+        copyText(raw(w.display()), 'Результат скопирован');
+        return;
+      }
+      const sel = /^[0-9]$/.test(e.key) ? `[data-digit="${e.key}"]` : KEY_MAP[e.key];
+      if (!sel) return;
+      e.preventDefault();
+      const btn = $(sel);
+      act(btn);
+      render();
+    });
+
+    renderHistory();
+    await selectEngine(current);
+  </script>
+</body>
+</html>

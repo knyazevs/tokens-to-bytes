@@ -1,0 +1,16 @@
+{
+  "name": "tokens-to-bytes",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Research artifact: cost, correctness and competitiveness of LLM-synthesized WebAssembly",
+  "license": "MIT",
+  "scripts": {
+    "tokens": "node builds/tokens.mjs",
+    "measure": "node builds/measure.mjs",
+    "all": "npm run tokens && npm run measure"
+  },
+  "devDependencies": {
+    "gpt-tokenizer": "^4.1.2"
+  }
+}

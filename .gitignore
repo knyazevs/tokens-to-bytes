@@ -1,0 +1,6 @@
+.tools/
+node_modules/
+builds/rust/target/
+*.log
+.DS_Store
+Thumbs.db

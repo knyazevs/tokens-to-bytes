@@ -1,0 +1,22 @@
+[target.wasm32-unknown-unknown]
+rustflags = [
+  "-C", "link-arg=--no-entry",
+  "-C", "link-arg=-s",
+  "-C", "link-arg=--export=clear",
+  "-C", "link-arg=--export=ce",
+  "-C", "link-arg=--export=digit",
+  "-C", "link-arg=--export=dot",
+  "-C", "link-arg=--export=back",
+  "-C", "link-arg=--export=neg",
+  "-C", "link-arg=--export=op",
+  "-C", "link-arg=--export=equals",
+  "-C", "link-arg=--export=display",
+  "-C", "link-arg=--export=acc",
+  "-C", "link-arg=--export=cur",
+  "-C", "link-arg=--export=opCode",
+  "-C", "link-arg=--export=error",
+  "-C", "link-arg=--export=fresh",
+  "-C", "link-arg=--export=lastOp",
+  "-C", "link-arg=--export=operand",
+  "-C", "link-arg=--export=leftOperand",
+]

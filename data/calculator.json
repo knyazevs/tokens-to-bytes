@@ -1,0 +1,188 @@
+{
+  "project": "calculator",
+  "protocol": 1,
+  "generatedAt": "2026-11-18T10:27:33.178Z",
+  "environment": {
+    "node": "v24.20.0",
+    "platform": "win32 x64",
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12600KF",
+    "tokenizer": "o200k_base"
+  },
+  "engines": [
+    {
+      "id": "manual",
+      "name": "Ручной байткод",
+      "short": "manual",
+      "file": "calc.wasm",
+      "method": "байткод без компилятора",
+      "toolchain": "WAT → wasm вручную",
+      "source": "projects/calculator/calc.wat",
+      "authoring": "projects/calculator/calc.wat",
+      "tone": "#3b82f6",
+      "bytes": 1147,
+      "gzip": 595,
+      "brotli": 567,
+      "tests": {
+        "passed": 17,
+        "total": 17
+      },
+      "perf": {
+        "opsPerSec": 137260724,
+        "samples": [
+          123805487,
+          136170126,
+          137260724,
+          139430233,
+          151172741
+        ],
+        "workloadOps": 76
+      },
+      "tokens": {
+        "artifact": 3499,
+        "artifactFile": "projects/calculator/calc.wat",
+        "artifactBytes": 10177,
+        "base64": 802
+      }
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "short": "rust",
+      "file": "calc-rust.wasm",
+      "method": "rustc → wasm32-unknown-unknown → wasm-opt",
+      "toolchain": "rustc + wasm-opt -Oz",
+      "source": "builds/rust/src/lib.rs",
+      "authoring": "builds/rust/src/lib.rs",
+      "tone": "#f59e0b",
+      "bytes": 2042,
+      "gzip": 914,
+      "brotli": 869,
+      "tests": {
+        "passed": 17,
+        "total": 17
+      },
+      "perf": {
+        "opsPerSec": 96856530,
+        "samples": [
+          94990579,
+          95797441,
+          96856530,
+          99612619,
+          100821813
+        ],
+        "workloadOps": 76
+      },
+      "tokens": {
+        "artifact": 1548,
+        "artifactFile": "builds/rust/src/lib.rs",
+        "artifactBytes": 5155,
+        "base64": 1549
+      }
+    },
+    {
+      "id": "as",
+      "name": "AssemblyScript",
+      "short": "as",
+      "file": "calc-assemblyscript.wasm",
+      "method": "asc → wasm → wasm-opt",
+      "toolchain": "AssemblyScript 0.28 + wasm-opt -Oz",
+      "source": "builds/assemblyscript/assembly/index.ts",
+      "authoring": "builds/assemblyscript/assembly/index.ts",
+      "tone": "#10b981",
+      "bytes": 1164,
+      "gzip": 616,
+      "brotli": 588,
+      "tests": {
+        "passed": 17,
+        "total": 17
+      },
+      "perf": {
+        "opsPerSec": 101043563,
+        "samples": [
+          96621564,
+          98326818,
+          101043563,
+          101328942,
+          104459118
+        ],
+        "workloadOps": 76
+      },
+      "tokens": {
+        "artifact": 1411,
+        "artifactFile": "builds/assemblyscript/assembly/index.ts",
+        "artifactBytes": 3646,
+        "base64": 827
+      }
+    },
+    {
+      "id": "c",
+      "name": "C",
+      "short": "c",
+      "file": "calc-c.wasm",
+      "method": "clang --target=wasm32-freestanding",
+      "toolchain": "clang 24 + wasm-ld, -Oz -nostdlib",
+      "source": "builds/c/calc.c",
+      "authoring": "builds/c/calc.c",
+      "tone": "#8b5cf6",
+      "bytes": 1935,
+      "gzip": 944,
+      "brotli": 883,
+      "tests": {
+        "passed": 17,
+        "total": 17
+      },
+      "perf": {
+        "opsPerSec": 98509769,
+        "samples": [
+          97632767,
+          98196270,
+          98509769,
+          101399495,
+          102056260
+        ],
+        "workloadOps": 76
+      },
+      "tokens": {
+        "artifact": 1209,
+        "artifactFile": "builds/c/calc.c",
+        "artifactBytes": 3426,
+        "base64": 1440
+      }
+    },
+    {
+      "id": "cpp",
+      "name": "C++",
+      "short": "cpp",
+      "file": "calc-cpp.wasm",
+      "method": "clang++ --target=wasm32-freestanding",
+      "toolchain": "clang++ 24, -Oz -fno-exceptions -fno-rtti",
+      "source": "builds/cpp/calc.cpp",
+      "authoring": "builds/cpp/calc.cpp",
+      "tone": "#ec4899",
+      "bytes": 1872,
+      "gzip": 911,
+      "brotli": 822,
+      "tests": {
+        "passed": 17,
+        "total": 17
+      },
+      "perf": {
+        "opsPerSec": 49018039,
+        "samples": [
+          46384198,
+          46903721,
+          49018039,
+          84005477,
+          89213272
+        ],
+        "workloadOps": 76
+      },
+      "tokens": {
+        "artifact": 1225,
+        "artifactFile": "builds/cpp/calc.cpp",
+        "artifactBytes": 3757,
+        "base64": 1403
+      }
+    }
+  ]
+}

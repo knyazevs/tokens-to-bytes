@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "updated": "2026-11-18",
+  "projects": [
+    {
+      "slug": "calculator",
+      "name": "Калькулятор",
+      "status": "live",
+      "summary": "State machine на 17 экспортов: ввод, дроби, backspace, смена знака, цепочки операций и повтор «=». Первая точка серии: достаточно маленькая, чтобы сравнить пять реализаций построчно.",
+      "tags": ["state machine", "f64", "17 exports", "5 реализаций"],
+      "demo": "projects/calculator/index.html",
+      "bench": "projects/calculator/bench.html",
+      "source": "projects/calculator",
+      "results": "data/calculator.json"
+    },
+    {
+      "slug": "json",
+      "name": "JSON-парсер",
+      "status": "planned",
+      "summary": "Рекурсивный разбор с ошибками и позициями. Проверка гипотезы: растёт ли разрыв в весе и токенах при переходе от арифметики к разбору строк.",
+      "tags": ["parser", "utf-8", "error positions"],
+      "demo": null,
+      "bench": null,
+      "source": null,
+      "results": null
+    },
+    {
+      "slug": "regex",
+      "name": "Regex-движок",
+      "status": "planned",
+      "summary": "Бэктрекинг по небольшому подмножеству PCRE. Здесь важны не только байты, но и защита от катастрофического бэктрекинга — отдельная метрика корректности.",
+      "tags": ["backtracking", "bounded input", "worst case"],
+      "demo": null,
+      "bench": null,
+      "source": null,
+      "results": null
+    },
+    {
+      "slug": "vm",
+      "name": "Стековая VM",
+      "status": "planned",
+      "summary": "Интерпретатор байткода с циклом, ветвлениями и стеком. Проверяет предел прямого синтеза: когда ручной wasm перестаёт помещаться в контекст и начинается декомпозиция.",
+      "tags": ["interpreter", "bytecode", "control flow"],
+      "demo": null,
+      "bench": null,
+      "source": null,
+      "results": null
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>From Tokens to Bytes — LLM-синтез WebAssembly</title>
+  <meta name="description" content="Research artifact: стоимость в токенах, корректность, вес и скорость WebAssembly, синтезированного LLM напрямую и собранного из Rust, AssemblyScript, C и C++.">
+  <meta property="og:title" content="From Tokens to Bytes">
+  <meta property="og:description" content="Cost, correctness and competitiveness of LLM-synthesized WebAssembly.">
+  <meta property="og:type" content="article">
+  <link rel="stylesheet" href="assets/paper.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2315171c'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='15' fill='%23f59e0b' text-anchor='middle'%3E%E2%86%92%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#top">tokens<span class="arrow">→</span>bytes</a>
+    <nav class="topnav" aria-label="Разделы статьи">
+      <a href="#abstract">Аннотация</a>
+      <a href="#setup">Установка</a>
+      <a href="#method">Метод</a>
+      <a href="#results">Результаты</a>
+      <a href="#demo">Демо</a>
+      <a href="#bench">Бенчмарк</a>
+      <a href="#projects">Проекты</a>
+      <a href="#reproduce">Воспроизведение</a>
+    </nav>
+    <div class="top-actions">
+      <a class="iconbtn" id="repo-link" href="https://github.com/knyazevs/tokens-to-bytes" aria-label="Репозиторий на GitHub" title="Исходники на GitHub">⌥</a>
+      <button class="iconbtn" id="theme" type="button" aria-label="Переключить тему" title="Светлая / тёмная тема">◐</button>
+    </div>
+  </header>
+
+  <div class="shell" id="top">
+    <aside class="toc" aria-label="Оглавление">
+      <p class="toc-title">Содержание</p>
+      <ol>
+        <li><a href="#abstract">Аннотация</a></li>
+        <li><a href="#rq">1 · Вопросы</a></li>
+        <li><a href="#setup">2 · Установка</a></li>
+        <li><a href="#method">3 · Метод</a></li>
+        <li><a href="#results">4 · Результаты</a></li>
+        <li><a href="#demo">5 · Демо</a></li>
+        <li><a href="#bench">6 · Бенчмарк</a></li>
+        <li><a href="#projects">7 · Проекты</a></li>
+        <li><a href="#threats">8 · Ограничения</a></li>
+        <li><a href="#reproduce">9 · Воспроизведение</a></li>
+        <li><a href="#cite">Цитирование</a></li>
+      </ol>
+    </aside>
+
+    <main class="content">
+      <p class="kicker">Research artifact · v0.1 · <span id="updated">18 ноября 2026</span></p>
+      <h1>From Tokens<br><span class="dim">to Bytes</span></h1>
+      <p class="subtitle">Стоимость, корректность и конкурентоспособность WebAssembly, синтезированного языковой моделью напрямую — без компилятора.</p>
+
+      <div class="byline">
+        <b>Сергей Князев</b>
+        <span class="sep">·</span>
+        <span>независимое исследование</span>
+        <span class="sep">·</span>
+        <a href="#cite">BibTeX</a>
+        <span class="sep">·</span>
+        <span>MIT</span>
+      </div>
+
+      <div class="keyfigs" aria-label="Ключевые числа">
+        <div class="kf"><b>5</b><span>реализаций одной логики</span></div>
+        <div class="kf"><b>17</b><span>функций в общем API</span></div>
+        <div class="kf"><b>17</b><span>тестов на каждую сборку</span></div>
+        <div class="kf"><b id="kf-min">1147 Б</b><span>минимальный модуль</span></div>
+        <div class="kf"><b id="kf-tokens">3499</b><span>токенов у ручного WAT</span></div>
+      </div>
+
+      <section id="abstract" class="abstract">
+        <div class="label">Abstract</div>
+        <div>
+          <p>Может ли языковая модель писать WebAssembly-байткод напрямую, без исходного языка и компилятора? Этот артефакт измеряет цену такого подхода на одном прикладном примере: калькуляторе с фиксированным API из 17 функций и одинаковым поведением.</p>
+          <p>Сравниваются пять реализаций: байткод, написанный моделью, и сборки из Rust, AssemblyScript, C и C++. Для каждой измеряются токены артефакта, корректность на общем наборе тестов, размер модуля и скорость выполнения. Предварительный результат: ручной байткод даёт самый маленький модуль (<span data-stat="min-bytes">1147</span> Б) и самую высокую скорость в Node-бенчмарке, но требует в <span data-stat="token-ratio">2,3–2,9</span> раза больше токенов, чем исходники на C или C++. Компиляторы выигрывают по стоимости авторинга, а не по весу.</p>
+        </div>
+      </section>
+
+      <!-- 1 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="rq">
+        <h2><span class="num">1</span> Вопросы</h2>
+        <p class="lede">Пять вопросов задают протокол измерений. Первые четыре закрываются на калькуляторе; пятый — повестка следующих проектов.</p>
+
+        <div class="rq-grid">
+          <div class="rq">
+            <b>RQ1 · Цена</b>
+            <p>Сколько токенов нужно, чтобы получить корректный модуль, и как это соотносится с исходником на высокоуровневом языке?</p>
+          </div>
+          <div class="rq">
+            <b>RQ2 · Валидируемость</b>
+            <p>Насколько полно поведение покрывается автоматическими тестами и совпадает ли оно между независимыми реализациями?</p>
+          </div>
+          <div class="rq">
+            <b>RQ3 · Вес</b>
+            <p>Сколько байт занимает модуль до и после gzip/brotli — и проигрывает ли ручной байткод компиляторам?</p>
+          </div>
+          <div class="rq">
+            <b>RQ4 · Производительность</b>
+            <p>Насколько быстро синтезированный байткод выполняет одинаковую нагрузку по сравнению со сборками из компиляторов?</p>
+          </div>
+          <div class="rq">
+            <b>RQ5 · Масштабирование</b>
+            <p>Сохраняются ли выводы при переходе от калькулятора к более сложным приложениям — парсерам, регулярным выражениям, интерпретаторам?</p>
+          </div>
+          <div class="rq">
+            <b>Метрика честности</b>
+            <p>Что именно не измерено: токены генерации и время разработки требуют логирования в момент генерации. В v0.1 они отмечены явно, а не реконструированы задним числом.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="setup">
+        <h2><span class="num">2</span> Установка</h2>
+        <p class="lede">Один поведенческий контракт, пять путей к его реализации.</p>
+
+        <p>Все модули экспортируют один и тот же набор функций. Внешний код — кнопки калькулятора — не знает, на каком языке написана реализация: он вызывает <code>digit</code>, <code>op</code>, <code>equals</code> и читает <code>display</code>. Состояние ввода, дроби, backspace, смена знака, цепочки операций и повтор <code>=</code> живут внутри модуля.</p>
+
+        <div class="table-wrap">
+          <table class="data" id="setup-table">
+            <thead>
+              <tr><th>Реализация</th><th>Как получена</th><th>Инструменты</th><th>Исходник</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" class="quiet">Загрузка реестра…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Контракт API</h3>
+        <pre><code>digit(i32)  dot()  back()  neg()  op(i32)  equals()  clear()  ce()
+
+display() → f64      acc() → f64        cur() → f64
+opCode() → i32       lastOp() → i32     fresh() → i32
+error() → i32        operand() → f64    leftOperand() → f64
+
+// коды операций: 1 = +   2 = −   3 = ×   4 = ÷</code></pre>
+        <p>17 экспортов. Ни один модуль не импортирует ничего из окружения: <code>WebAssembly.Module.imports()</code> пуст для всех пяти сборок. Это делает сравнение чистым — измеряется только код, а не адаптеры.</p>
+
+        <div class="callout">
+          <p><b>Что считается «ручным» байткодом.</b> Модуль <code>calc.wasm</code> написан моделью как байткод, без высокоуровневого исходника. Для токенизации и чтения он представлен в канонической текстовой форме WAT (<code>calc.wat</code>, 612 строк) — это дизассемблер, а не обязательно та форма, в которой модель его порождала.</p>
+        </div>
+      </section>
+
+      <!-- 3 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="method">
+        <h2><span class="num">3</span> Метод</h2>
+        <p class="lede">Что и как измеряется — с явными границами применимости.</p>
+
+        <h3>Метрики</h3>
+        <ul>
+          <li><em class="term">Токены артефакта</em> — <code>countTokens</code> (o200k_base) от естественной формы: исходник на языке реализации или WAT для ручного байткода. Это нижняя граница стоимости генерации: модель ещё тратит токены на рассуждение, ошибки и правки.</li>
+          <li><em class="term">Токены генерации</em> — <code>usage.output_tokens</code> конкретного прогона. В v0.1 не измерялись; протокол для будущих прогонов описан ниже.</li>
+          <li><em class="term">Тесты</em> — 16 сценариев ввода/арифметики и одна проверка формулы после <code>=</code>. Один и тот же код выполняется в Node и в браузере.</li>
+          <li><em class="term">ops/sec</em> — вызовы API в секунду на детерминированной нагрузке. Пять раундов по 120 мс, медиана; перед этим — прогрев 60 мс.</li>
+          <li><em class="term">Размер</em> — байты модуля, gzip уровня 9 и brotli качества 11.</li>
+        </ul>
+
+        <h3>Нагрузка</h3>
+        <p>Нагрузка — 12 последовательностей по 76 вызовов API за проход: цифры, дроби, все четыре операции, повтор <code>=</code>, backspace и смена знака. Последовательности детерминированы и одинаковы для всех сборок; <code>clear()</code> вызывается перед каждой и включается в счётчик.</p>
+
+        <h3>Окружение</h3>
+        <p id="results-env" class="muted">Загрузка окружения…</p>
+
+        <h3>Протокол для токенов генерации</h3>
+        <p>Чтобы измерить реальную стоимость, каждый прогон выполняется в чистой сессии с фиксированным промптом, а из ответа API сохраняются <code>usage.input_tokens</code>, <code>usage.output_tokens</code>, число итераций до зелёных тестов и wall-clock. Результат пишется в <code>data/runs.json</code>. Пока там только схема и <code>null</code> — заполнять задним числом было бы нечестно.</p>
+
+        <div class="callout">
+          <p><b>Почему ops/sec — не абсолют.</b> Микробенчмарк измеряет пару «JS-вызов → wasm-функция», поэтому накладные расходы вызова входят в результат. Он сравним между реализациями, но не описывает вычислительную мощность wasm в целом.</p>
+        </div>
+      </section>
+
+      <!-- 4 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="results">
+        <h2><span class="num">4</span> Результаты</h2>
+        <p class="lede">Самый маленький модуль стоит самых дорогих токенов.</p>
+
+        <div class="toolbar">
+          <div class="seg" role="group" aria-label="Метрика веса">
+            <button type="button" data-metric="bytes" aria-pressed="true">.wasm</button>
+            <button type="button" data-metric="gzip" aria-pressed="false">gzip</button>
+            <button type="button" data-metric="brotli" aria-pressed="false">brotli</button>
+          </div>
+          <button class="btn" id="verify-btn" type="button">Проверить сборки в браузере</button>
+        </div>
+
+        <figure>
+          <div class="chart-rows" id="size-chart" aria-label="Размер модулей"></div>
+          <figcaption><b>Рис. 1.</b> Размер модуля по реализациям. Переключатель сверху меняет метрику; шкала нормирована на максимум в текущей метрике.</figcaption>
+        </figure>
+
+        <div class="table-wrap">
+          <table class="data" id="results-table">
+            <thead>
+              <tr>
+                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th>
+                <th>Тесты</th><th>ops/sec</th><th>Токены</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7" class="quiet">Загрузка измерений…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="live-status" id="verify-status" role="status">Данные из <code>data/calculator.json</code>, собранные Node-бенчмарком.</p>
+
+        <figure>
+          <svg class="scatter" id="scatter" viewBox="0 0 640 300" role="img" aria-label="Токены артефакта против размера модуля"></svg>
+          <figcaption><b>Рис. 2.</b> Токены артефакта (ось X) против размера модуля (ось Y). Левый нижний угол — «дёшево написать и мало весит»; правый верхний — дорого и тяжело. Ручной WAT — крайняя правая точка при минимальном весе.</figcaption>
+        </figure>
+
+        <h3>Наблюдения</h3>
+        <ul>
+          <li><b>Вес.</b> Ручной байткод — 1 147 Б; AssemblyScript почти догоняет (1 164 Б, +1,5 %). C++ и C — 1 872 и 1 935 Б, Rust — 2 042 Б. После gzip порядок сохраняется: 595 / 616 / 911 / 944 / 914 Б.</li>
+          <li><b>Токены.</b> Дешевле всего писать на C (1 209 токенов) и C++ (1 225), дороже — Rust (1 548) и AssemblyScript (1 411). Ручной WAT требует 3 499 токенов — в 2,3–2,9 раза больше лучших компилируемых вариантов.</li>
+          <li><b>Скорость.</b> В Node ручной байткод быстрее Rust, AssemblyScript и C примерно в <span data-stat="perf-range">1,4</span> раза; C++ отстаёт сильнее — ручной модуль быстрее его в <span data-stat="perf-cpp">2,8</span> раза. Разрыв на таких функциях чувствителен к инлайнингу: у C-сборки <code>op</code> и <code>equals</code> заметно быстрее, чем у Rust и C++ при идентичной логике.</li>
+        </ul>
+
+        <div class="callout">
+          <p><b>Вывод.</b> Прямой синтез байткода оправдан, когда важнее вес и предсказуемость рантайма, а не стоимость разработки. Компиляторы дают более дешёвый авторинг и почти тот же вес (AssemblyScript — +1,5 %), но требуют цепочки инструментов.</p>
+        </div>
+      </section>
+
+      <!-- 5 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="demo">
+        <h2><span class="num">5</span> Демо</h2>
+        <p class="lede">Один интерфейс, пять движков. Переключение не меняет ни одной строки UI-кода.</p>
+
+        <div class="engine-tabs" id="engine-tabs" role="group" aria-label="Выбор реализации"></div>
+
+        <div class="demo-frame">
+          <div class="demo-chrome">
+            <span class="lamp"></span><span class="lamp"></span><span class="lamp"></span>
+            <span class="url" id="demo-url">projects/calculator/index.html</span>
+          </div>
+          <iframe id="demo-frame" src="projects/calculator/index.html" title="Калькулятор на WebAssembly" loading="lazy"></iframe>
+        </div>
+        <figcaption style="margin-top:8px;padding:0;border:0;background:none">Калькулятор доступен и отдельно: <a href="projects/calculator/index.html">projects/calculator/</a>. Демо загружает wasm через <code>fetch</code>, поэтому при открытии статьи с <code>file://</code> нужен локальный сервер.</figcaption>
+
+        <p>Интерфейс калькулятора не знает о языках: он вызывает экспорты, а <code>?engine=</code> указывает, какой модуль загрузить. Это и есть практическая проверка контракта — если сборка ведёт себя иначе, её видно руками за пару нажатий.</p>
+      </section>
+
+      <!-- 6 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="bench">
+        <h2><span class="num">6</span> Бенчмарк</h2>
+        <p class="lede">Та же нагрузка, но исполняется в вашем браузере прямо сейчас.</p>
+
+        <p>Кнопка ниже загружает все пять модулей, прогревает их и выполняет одинаковую нагрузку — 76 вызовов API за проход, пять раундов по 120 мс, медиана. Числа браузера не совпадут с Node: другой JIT, другая машина, другой тепловой режим. Сравнивать имеет смысл реализации между собой внутри одного запуска.</p>
+
+        <div class="live-head">
+          <button class="btn primary" id="bench-btn" type="button">Запустить бенчмарк</button>
+          <span class="live-status" id="bench-status" role="status">не запускался</span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data" id="bench-table">
+            <thead>
+              <tr><th>Реализация</th><th>ops/sec</th><th>мс / 1M вызовов</th><th>к лучшему</th><th>Раунды</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="5" class="quiet">Нажмите «Запустить бенчмарк».</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="notes">
+          <span>Методика: <code>benchmark()</code> из <code>assets/protocol.js</code>, общая для Node и браузера.</span>
+          <span>Node-числа выше получены на <span data-stat="cpu">этой машине</span> и сохранены в <code>data/calculator.json</code>.</span>
+        </p>
+      </section>
+
+      <!-- 7 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="projects">
+        <h2><span class="num">7</span> Проекты</h2>
+        <p class="lede">Артефакт спроектирован как серия: калькулятор — первая, самая простая точка.</p>
+
+        <div class="projects" id="projects">
+          <div class="project"><p class="quiet">Загрузка реестра…</p></div>
+        </div>
+
+        <p>Каждый проект получает каталог <code>projects/&lt;slug&gt;/</code>, свой реестр реализаций и файл измерений. Статья подхватывает проект из <code>data/projects.json</code> и добавляет строку в таблицу и карточку в этот раздел. Следующие приложения добавят то, чего нет в калькуляторе: парсинг строк, регулярные выражения и интерпретацию байткода — там вес и корректность важнее, чем в арифметике.</p>
+      </section>
+
+      <!-- 8 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="threats">
+        <h2><span class="num">8</span> Ограничения</h2>
+        <p class="lede">Что может сломать выводы — и что для этого нужно сделать.</p>
+
+        <ul>
+          <li><b>Один проект, пять реализаций.</b> Калькулятор — маленькая state machine. Переносить числа на парсеры и интерпретаторы без новых измерений нельзя; это и есть RQ5.</li>
+          <li><b>Токены артефакта — не стоимость генерации.</b> Они не включают рассуждение, отвергнутые варианты и отладку. Реальная цена может быть в разы выше; для её измерения нужен лог <code>usage.output_tokens</code>.</li>
+          <li><b>WAT — дизассемблер.</b> Ручной байткод мог порождаться не как WAT, а как последовательность инструкций или base64. Тогда 3 499 токенов — верхняя оценка, а не точное значение.</li>
+          <li><b>Микробенчмарк.</b> Доминируют накладные расходы вызова JS → wasm. Различия в инлайнинге (C++ против C) могут переворачивать порядок при другой нагрузке.</li>
+          <li><b>Одно окружение.</b> Node 24 на одной машине, один прогон, без доверительных интервалов и статистических тестов. Браузерный запуск — независимая, но не идентичная проверка.</li>
+          <li><b>Поведенческие тесты, не формальная верификация.</b> 17 проверок покрывают заявленное поведение, но не доказывают отсутствие ошибок на всех входах. Fuzzing и сравнение с эталонной моделью — следующий шаг.</li>
+          <li><b>Разные тулчейны.</b> Компиляторы получают <code>-Oz</code> и <code>wasm-opt</code>; ручной модуль не оптимизировался постфактум. Это ближе к реальному использованию, но не идеально контролируемый эксперимент.</li>
+        </ul>
+      </section>
+
+      <!-- 9 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="reproduce">
+        <h2><span class="num">9</span> Воспроизведение</h2>
+        <p class="lede">Все числа в статье пересчитываются двумя командами.</p>
+
+        <pre><code>git clone https://github.com/knyazevs/tokens-to-bytes
+cd tokens-to-bytes
+npm install
+
+npm run tokens    # data/tokens.json  — токены артефактов
+npm run measure   # data/calculator.json — размер, тесты, ops/sec</code></pre>
+
+        <p>Для пересборки wasm из исходников нужны Rust с таргетом <code>wasm32-unknown-unknown</code>, AssemblyScript, clang с <code>wasm-ld</code> и <code>wasm-opt</code>. Точные команды и конфиги лежат в <code>builds/</code>; готовые бинарники уже в репозитории, поэтому для проверки измерений тулчейны не нужны.</p>
+
+        <pre class="tree"><code>tokens-to-bytes/
+├─ index.html                 статья
+├─ assets/                    стили, скрипты, общий протокол
+├─ data/
+│  ├─ projects.json           реестр проектов
+│  ├─ calculator.json         измерения калькулятора
+│  └─ tokens.json             токены артефактов
+├─ projects/calculator/       демо + пять wasm + WAT
+└─ builds/                    исходники, сборка, измерение</code></pre>
+
+        <p>Любая сборка запускается в демо отдельно: <code>projects/calculator/index.html?engine=calc-rust.wasm</code>. Страница бенчмарка проекта: <a href="projects/calculator/bench.html">projects/calculator/bench.html</a>.</p>
+      </section>
+
+      <!-- cite ──────────────────────────────────────────────── -->
+      <section class="chapter" id="cite">
+        <h2><span class="num">§</span> Цитирование</h2>
+        <div class="bib">
+          <button class="copy-bib" id="copy-bib" type="button">копировать</button>
+          <pre><code id="bibtex">@misc{knyazev2026tokenstobytes,
+  title  = {From Tokens to Bytes: Cost, Correctness, and
+            Competitiveness of LLM-Synthesized WebAssembly},
+  author = {Knyazev, Sergey},
+  year   = {2026},
+  note   = {Research artifact, v0.1},
+  url    = {https://github.com/knyazevs/tokens-to-bytes}
+}</code></pre>
+        </div>
+      </section>
+
+      <footer class="paper-foot">
+        <p>tokens→bytes · v0.1 · обновлено <span id="foot-updated">18 ноября 2026</span>. Текст и код — MIT. Собрано без фреймворков: HTML, CSS, ES-модули и WebAssembly.</p>
+        <p>Числа измерений генерируются скриптами в <code>builds/</code>. Если цифра в тексте расходится с таблицей — верьте таблице.</p>
+      </footer>
+    </main>
+  </div>
+
+  <script type="module" src="assets/paper.js"></script>
+</body>
+</html>
