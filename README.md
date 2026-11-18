@@ -3,8 +3,13 @@
 **Cost, Correctness, and Competitiveness of LLM-Synthesized WebAssembly**
 
 Research artifact: can a language model write WebAssembly bytecode directly, without a
-high-level language and a compiler? The first project is a calculator with a fixed API of
-17 exports, implemented six ways — five languages, with C++ built twice:
+high-level language and a compiler? Two projects are measured, each with the same fixed API
+implemented six ways — five languages, with C++ built twice.
+
+## Calculator
+
+17 exports. State machine: input, decimals, backspace, sign change, operation chains and
+repeat `=`.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
@@ -25,6 +30,28 @@ bytes: AssemblyScript is 1 164 B vs 1 418 B. It is authored as WAT and assembled
 `wasm-as`. The speed-oriented rewrite inlines hot helpers and uses `br_table` dispatch;
 it was differentially fuzzed against the previous version (500 000 state comparisons).
 
+## JSON parser
+
+Byte-oriented parsing with recursion, UTF-8 decoding, `\u` escapes (including surrogate
+pairs), floating-point numbers and exact error positions. No imports; the input buffer lives
+at `0x10000` and the root-string buffer at `0x20000`.
+
+| Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
+|---|---|---:|---:|---:|---:|---:|
+| Hand-written bytecode | WAT → wasm, no compiler | 3 271 B | 1 385 B | 1 268 B | 27/27 | 9 556 |
+| Rust | rustc → wasm32-unknown-unknown → wasm-opt | 4 699 B | 2 038 B | 1 843 B | 27/27 | 4 135 |
+| AssemblyScript | asc → wasm-opt | 3 190 B | 1 378 B | 1 259 B | 27/27 | 3 828 |
+| C | clang --target=wasm32-freestanding | 4 137 B | 1 866 B | 1 644 B | 27/27 | 3 303 |
+| C++ -Oz | clang++ -Oz, no exceptions/RTTI | 4 676 B | 2 045 B | 1 803 B | 27/27 | 3 400 |
+| C++ -O3 | clang++ -O3, no exceptions/RTTI | 5 701 B | 2 280 B | 2 012 B | 27/27 | 3 400 |
+
+The picture reverses: AssemblyScript is the smallest both raw and compressed, and the
+hand-written module is second after gzip/brotli (+0.5 % / +0.7 %) — no longer the winner.
+Its WAT costs 2.3–2.9× the tokens of the compiled sources. All six builds parse 13 valid and
+14 invalid documents with identical error codes and positions. Speed in `data/json.json` is
+2.63–2.93 M documents/s (1.11× spread); C++ `-O3` is fastest, the hand-written module is
+slowest, and differences below 2–3 % were not resolved with paired blocks.
+
 The article lives at the repository root: [`index.html`](index.html).
 Live version: <https://knyazevs.github.io/tokens-to-bytes/>.
 
@@ -33,10 +60,12 @@ Live version: <https://knyazevs.github.io/tokens-to-bytes/>.
 - **Artifact tokens** — tokens of the natural authoring form (source code, or WAT for the
   hand-written module), counted with `o200k_base`. This is a **lower bound** on generation
   cost, not the model's actual output-token usage.
-- **Correctness** — 16 input/arithmetic scenarios plus one formula check after `=`, run
-  identically in Node and in the browser.
+- **Correctness** — 17 calculator scenarios (16 input/arithmetic plus one formula check after
+  `=`) and 27 JSON tests (13 valid documents, 14 invalid with expected error codes and
+  positions), run identically in Node and in the browser.
 - **Size** — raw wasm bytes, gzip -9, brotli q11.
-- **Performance** — API calls per second on a deterministic workload (76 calls per pass).
+- **Performance** — calls per second on a deterministic calculator workload (76 calls per
+  pass), or documents per second for the JSON parser (13 documents per pass).
   Every build is measured in its own Node process: 750 ms warmup, 10 rounds × 150 ms, six
   processes — 60 samples per build. The headline is the median; min, mean, max and standard
   deviation are published alongside it to show the noise. In the browser each build gets its
@@ -66,16 +95,19 @@ python -m http.server 8000
 ```
 
 A server is required because the demo and benchmark load `.wasm` with `fetch`. The
-calculator alone still has an inline base64 fallback and works from `file://`.
+hand-written build of each project still has an inline base64 fallback and works from
+`file://`; the other five builds need the server.
 
 ## Recompute
 
 ```bash
 npm install
-npm run tokens        # data/tokens.json
-npm run measure       # data/calculator.json (sizes, tests, ops/sec)
-npm run build:manual  # rebuild the hand-written wasm from calc.wat (needs wasm-as)
-npm run build:cpp     # rebuild C++ -Oz and -O3 (needs clang)
+npm run tokens              # data/tokens.json
+npm run measure             # data/calculator.json (sizes, tests, ops/sec)
+npm run tokens -- json      # data/tokens-json.json
+npm run measure -- json     # data/json.json (sizes, tests, docs/sec)
+npm run build:manual        # rebuild the hand-written calculator wasm (needs wasm-as)
+npm run build:json          # rebuild all six JSON builds (needs Rust, asc, clang, wasm-opt)
 ```
 
 On a hybrid CPU, pin the measurement to P-cores so Windows does not schedule it onto
@@ -89,21 +121,23 @@ $env:AFFINITY='FFF'; cmd /c start /affinity FFF /wait /b node builds/measure.mjs
 
 ```
 index.html                 the article
-assets/                    styles, scripts, shared protocol, isolated browser bench
+assets/                    styles, scripts, shared protocols, isolated browser bench
 data/
   projects.json            project registry
-  calculator.json          measurements
-  tokens.json              artifact token counts
+  calculator.json          calculator measurements
+  json.json                JSON parser measurements
+  tokens.json              calculator artifact token counts
+  tokens-json.json         JSON parser artifact token counts
 projects/calculator/       demo, six wasm modules, bench page, WAT
+projects/json/             demo, six wasm modules, bench page, WAT
 builds/                    sources, toolchain configs, measurement scripts
 ```
 
 Rebuilding the wasm modules requires Rust (`wasm32-unknown-unknown`), AssemblyScript,
-clang with `wasm-ld`, and `wasm-opt`; the hand-written module needs `wasm-as` from
+clang with `wasm-ld`, and `wasm-opt`; the hand-written modules need `wasm-as` from
 Binaryen. Ready binaries are committed, so measurements can be reproduced without the
-toolchains. The C++ artifacts are reproducible with `npm run build:cpp`;
-`calc-cpp.wasm` rebuilds byte-for-byte, and `npm run build:manual` reproduces
-`calc.wasm` from `calc.wat`.
+toolchains. `npm run build:json` rebuilds the JSON project; `npm run build:manual`
+reproduces the calculator's `calc.wasm` from `calc.wat`.
 
 ## License
 

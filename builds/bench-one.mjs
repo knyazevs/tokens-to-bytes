@@ -2,7 +2,8 @@
 // Нужен, чтобы V8 не делил бюджет оптимизации между несколькими wasm-модулями
 // и чтобы планировщик не переносил уже разогретый процесс на другое ядро.
 //
-//   node builds/bench-one.mjs <engine-id>
+//   node builds/bench-one.mjs <engine-id>              калькулятор (по умолчанию)
+//   node builds/bench-one.mjs <project> <engine-id>    проект серии
 //
 // Параметры можно переопределить переменными окружения:
 //   BENCH_WARMUP_MS=750 BENCH_ROUNDS=10 BENCH_DURATION_MS=150
@@ -13,26 +14,32 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { benchmark, describeStats, missingExports, runTests, WORKLOAD_OPS } from '../assets/protocol.js';
-import { ENGINES } from './engines.mjs';
+import { projectBySlug, PROJECTS } from './projects.mjs';
+import { describeStats } from '../assets/bench-core.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const id = process.argv[2];
-const engine = ENGINES.find((e) => e.id === id);
+const args = process.argv.slice(2);
+const slug = args.length > 1 || PROJECTS[args[0]] ? args[0] : 'calculator';
+const id = args.length > 1 ? args[1] : args[0];
+
+const project = projectBySlug(slug);
+const engine = project.engines.find((e) => e.id === id);
 
 if (!engine) {
-  console.error(`неизвестная сборка: ${id}`);
+  console.error(`неизвестная сборка: ${id} (проект ${slug})`);
   process.exit(1);
 }
 
 const config = {
-  warmupMs: Number(process.env.BENCH_WARMUP_MS ?? 750),
-  rounds: Number(process.env.BENCH_ROUNDS ?? 10),
-  durationMs: Number(process.env.BENCH_DURATION_MS ?? 150),
+  warmupMs: Number(process.env.BENCH_WARMUP_MS ?? project.bench.warmupMs),
+  rounds: Number(process.env.BENCH_ROUNDS ?? project.bench.rounds),
+  durationMs: Number(process.env.BENCH_DURATION_MS ?? project.bench.durationMs),
 };
 
 try {
-  const filePath = path.join(root, 'projects/calculator', engine.file);
+  const protocol = await import(project.protocol.href);
+  const { benchmark, missingExports, runTests, WORKLOAD_OPS } = protocol;
+  const filePath = path.join(root, project.dir, engine.file);
   const bytes = fs.readFileSync(filePath);
   if (!WebAssembly.validate(bytes)) throw new Error(`${engine.file}: invalid wasm`);
 

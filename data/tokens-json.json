@@ -1,0 +1,49 @@
+{
+  "tokenizer": "o200k_base",
+  "generatedAt": "2026-11-18T22:18:58.242Z",
+  "note": "artifactTokens — токены естественной формы артефакта (lower bound на стоимость генерации); binaryBase64Tokens — токены base64-представления wasm.",
+  "engines": {
+    "manual": {
+      "authoringFile": "projects/json/json.wat",
+      "authoringBytes": 29393,
+      "artifactTokens": 9556,
+      "binaryBase64Tokens": 2599,
+      "binaryBytes": 3271
+    },
+    "rust": {
+      "authoringFile": "builds/rust-json/src/lib.rs",
+      "authoringBytes": 13788,
+      "artifactTokens": 4135,
+      "binaryBase64Tokens": 3765,
+      "binaryBytes": 4699
+    },
+    "as": {
+      "authoringFile": "builds/assemblyscript/assembly/json.ts",
+      "authoringBytes": 10235,
+      "artifactTokens": 3828,
+      "binaryBase64Tokens": 2524,
+      "binaryBytes": 3190
+    },
+    "c": {
+      "authoringFile": "builds/c/json.c",
+      "authoringBytes": 9627,
+      "artifactTokens": 3303,
+      "binaryBase64Tokens": 3219,
+      "binaryBytes": 4137
+    },
+    "cpp": {
+      "authoringFile": "builds/cpp/json.cpp",
+      "authoringBytes": 10372,
+      "artifactTokens": 3400,
+      "binaryBase64Tokens": 3728,
+      "binaryBytes": 4676
+    },
+    "cpp-opt": {
+      "authoringFile": "builds/cpp/json.cpp",
+      "authoringBytes": 10372,
+      "artifactTokens": 3400,
+      "binaryBase64Tokens": 4532,
+      "binaryBytes": 5701
+    }
+  }
+}

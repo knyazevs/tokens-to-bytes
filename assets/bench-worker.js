@@ -4,13 +4,14 @@
 // V8 не успевает поднять оптимизацию для всех и последняя сборка проседает
 // в 2–3 раза. Отдельный Worker даёт каждому модулю собственный изолят.
 //
-// Клиент: assets/bench-client.js.
-
-import { benchmark, describeStats, missingExports, runTests, WORKLOAD_OPS } from './protocol.js';
+// Клиент: assets/bench-client.js. Протокол проекта приходит URL-ом в сообщении,
+// поэтому один и тот же Worker обслуживает все проекты серии.
 
 self.onmessage = async (ev) => {
-  const { url, warmupMs, rounds, durationMs } = ev.data;
+  const { url, protocolUrl, warmupMs, rounds, durationMs } = ev.data;
   try {
+    const { benchmark, describeStats, missingExports, runTests, WORKLOAD_OPS } = await import(protocolUrl);
+
     const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const bytes = new Uint8Array(await res.arrayBuffer());

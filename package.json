@@ -11,6 +11,7 @@
     "bench:one": "node builds/bench-one.mjs",
     "build:cpp": "node builds/build-cpp.mjs",
     "build:manual": "node builds/build-manual.mjs",
+    "build:json": "node builds/build.mjs json",
     "all": "npm run tokens && npm run measure"
   },
   "devDependencies": {

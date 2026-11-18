@@ -1,4 +1,8 @@
 import { missingExports, runTests } from './protocol.js';
+import {
+  missingExports as missingJsonExports,
+  runTests as runJsonTests,
+} from './protocol-json.js';
 import { benchIsolated, BENCH_PROTOCOL } from './bench-client.js';
 
 const REPO = 'https://github.com/knyazevs/tokens-to-bytes';
@@ -7,6 +11,7 @@ const $$ = (sel) => [...document.querySelectorAll(sel)];
 
 const fmtInt = (n) => Number(n).toLocaleString('ru-RU');
 const fmtBytes = (n) => `${fmtInt(n)} Б`;
+const fmtDec = (n, digits = 1) => Number(n).toFixed(digits).replace('.', ',');
 const pct = (n, max) => `${Math.max(2, (n / max) * 100).toFixed(1)}%`;
 
 /* ── тема ─────────────────────────────────────────────────── */
@@ -26,9 +31,6 @@ $('#repo-link').href = REPO;
 
 /* ── загрузка измерений ───────────────────────────────────── */
 
-let DATA = null;
-let PROJECTS = null;
-
 function dateRu(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '18 ноября 2026';
@@ -42,106 +44,128 @@ async function loadJson(path) {
 }
 
 function fail(message) {
-  const tables = { '#setup-table tbody': 4, '#results-table tbody': 7, '#spread-table tbody': 6 };
+  const tables = {
+    '#setup-table tbody': 4,
+    '#results-table tbody': 7,
+    '#spread-table tbody': 6,
+    '#json-setup-table tbody': 4,
+    '#json-results-table tbody': 7,
+    '#json-spread-table tbody': 6,
+  };
   for (const [sel, cols] of Object.entries(tables)) {
     const body = $(sel);
     if (body) body.innerHTML = `<tr><td colspan="${cols}" class="quiet">${message}</td></tr>`;
   }
-  $('#size-chart').innerHTML = `<p class="quiet" style="margin:0">${message}</p>`;
-  $('#verify-status').textContent = message;
-  $('#bench-status').textContent = 'данные недоступны';
+  for (const sel of ['#size-chart', '#json-size-chart']) {
+    const el = $(sel);
+    if (el) el.innerHTML = `<p class="quiet" style="margin:0">${message}</p>`;
+  }
+  for (const sel of ['#verify-status', '#json-verify-status', '#bench-status', '#json-bench-status']) {
+    const el = $(sel);
+    if (el) el.textContent = 'данные недоступны';
+  }
 }
 
-/* ── рендер ───────────────────────────────────────────────── */
+/* ── общие рендеры ────────────────────────────────────────── */
 
-function renderMeta(data) {
+function projectStats(data) {
   const engines = data.engines;
   const min = engines.reduce((a, b) => (a.bytes <= b.bytes ? a : b));
+  const minGzip = engines.reduce((a, b) => (a.gzip <= b.gzip ? a : b));
+  const minBrotli = engines.reduce((a, b) => (a.brotli <= b.brotli ? a : b));
   const manual = engines.find((e) => e.id === 'manual');
   const compiled = engines.filter((e) => e.id !== 'manual' && e.tokens);
 
-  $('#kf-min').textContent = fmtBytes(min.bytes);
-  if (manual?.tokens) $('#kf-tokens').textContent = fmtInt(manual.tokens.artifact);
-
-  const statMin = $('[data-stat="min-bytes"]');
-  if (statMin) statMin.textContent = fmtInt(min.bytes);
-
-  const minGzip = engines.reduce((a, b) => (a.gzip <= b.gzip ? a : b));
-  const statGzip = $('[data-stat="min-gzip"]');
-  if (statGzip) statGzip.textContent = fmtInt(minGzip.gzip);
-
-  const minBrotli = engines.reduce((a, b) => (a.brotli <= b.brotli ? a : b));
-  const statBrotli = $('[data-stat="min-brotli"]');
-  if (statBrotli) statBrotli.textContent = fmtInt(minBrotli.brotli);
-
+  let tokenRatio = null;
   if (manual?.tokens && compiled.length) {
     const ratios = compiled.map((e) => manual.tokens.artifact / e.tokens.artifact);
-    const lo = Math.min(...ratios);
-    const hi = Math.max(...ratios);
-    const stat = $('[data-stat="token-ratio"]');
-    if (stat) stat.textContent = `${lo.toFixed(1).replace('.', ',')}–${hi.toFixed(1).replace('.', ',')}`;
+    tokenRatio = { lo: Math.min(...ratios), hi: Math.max(...ratios) };
   }
 
   const perfValues = engines.map((e) => e.perf.opsPerSec);
   const perfBest = Math.max(...perfValues);
   const perfWorst = Math.min(...perfValues);
 
-  const spread = $('[data-stat="perf-spread"]');
-  if (spread) spread.textContent = (perfBest / perfWorst).toFixed(2).replace('.', ',');
-
-  const opsMin = $('[data-stat="ops-min"]');
-  if (opsMin) opsMin.textContent = (perfWorst / 1e6).toFixed(1).replace('.', ',');
-
-  const opsMax = $('[data-stat="ops-max"]');
-  if (opsMax) opsMax.textContent = (perfBest / 1e6).toFixed(1).replace('.', ',');
-
   const spreads = engines
     .filter((e) => e.perf.stats?.median)
     .map((e) => (e.perf.stats.stddev / e.perf.stats.median) * 100);
-  if (spreads.length) {
-    const noiseMin = $('[data-stat="noise-min"]');
-    if (noiseMin) noiseMin.textContent = Math.min(...spreads).toFixed(1).replace('.', ',');
-    const noiseMax = $('[data-stat="noise-max"]');
-    if (noiseMax) noiseMax.textContent = Math.max(...spreads).toFixed(1).replace('.', ',');
-  }
-
-  const samples = $('[data-stat="samples"]');
-  if (samples) samples.textContent = fmtInt(engines[0]?.perf.samples?.length ?? 0);
 
   const cpp = engines.find((e) => e.id === 'cpp');
   const cppOpt = engines.find((e) => e.id === 'cpp-opt');
-  if (cpp && cppOpt) {
-    const gain = $('[data-stat="cpp-gain"]');
-    if (gain) {
-      gain.textContent = Math.round((cppOpt.perf.opsPerSec / cpp.perf.opsPerSec - 1) * 100);
-    }
-    const size = $('[data-stat="cpp-size"]');
-    if (size) {
-      size.textContent = Math.round((cppOpt.bytes / cpp.bytes - 1) * 100);
-    }
+
+  return {
+    engines, min, minGzip, minBrotli, manual, compiled,
+    tokenRatio, perfBest, perfWorst, spreads, cpp, cppOpt,
+  };
+}
+
+function renderMeta(data, prefix = '', { global = false } = {}) {
+  const s = projectStats(data);
+  const key = (name) => (prefix ? `${prefix}-${name}` : name);
+  const set = (name, value) => {
+    const el = $(`[data-stat="${key(name)}"]`);
+    if (el) el.textContent = value;
+  };
+
+  if (global) {
+    $('#kf-min').textContent = fmtBytes(s.min.bytes);
+    if (s.manual?.tokens) $('#kf-tokens').textContent = fmtInt(s.manual.tokens.artifact);
+  }
+
+  set('min-bytes', fmtInt(s.min.bytes));
+  set('min-gzip', fmtInt(s.minGzip.gzip));
+  set('min-brotli', fmtInt(s.minBrotli.brotli));
+
+  if (s.tokenRatio) {
+    set('token-ratio', `${fmtDec(s.tokenRatio.lo)}–${fmtDec(s.tokenRatio.hi)}`);
+  }
+
+  set('perf-spread', fmtDec(s.perfBest / s.perfWorst, 2));
+  set('ops-min', fmtDec(s.perfWorst / 1e6));
+  set('ops-max', fmtDec(s.perfBest / 1e6));
+
+  if (s.spreads.length) {
+    set('noise-min', fmtDec(Math.min(...s.spreads)));
+    set('noise-max', fmtDec(Math.max(...s.spreads)));
+  }
+
+  set('samples', fmtInt(data.engines[0]?.perf.samples?.length ?? 0));
+
+  if (s.cpp && s.cppOpt) {
+    set('cpp-gain', String(Math.round((s.cppOpt.perf.opsPerSec / s.cpp.perf.opsPerSec - 1) * 100)));
+    set('cpp-size', String(Math.round((s.cppOpt.bytes / s.cpp.bytes - 1) * 100)));
   }
 
   const cpu = data.environment?.cpu ?? 'неизвестный CPU';
-  const statCpu = $('[data-stat="cpu"]');
-  if (statCpu) statCpu.textContent = cpu;
+  set('cpu', cpu);
 
-  const updated = dateRu(data.generatedAt);
-  $('#updated').textContent = updated;
-  $('#foot-updated').textContent = updated;
+  if (global) {
+    const updated = dateRu(data.generatedAt);
+    $('#updated').textContent = updated;
+    $('#foot-updated').textContent = updated;
 
-  const affinity = data.environment?.affinity;
-  $('#results-env').textContent =
-    `Node ${data.environment?.node ?? '—'} · ${data.environment?.platform ?? '—'} · ${cpu}` +
-    (affinity ? ` · привязка к ядрам 0x${affinity}` : '') +
-    ` · токенизатор ${data.environment?.tokenizer ?? '—'}`;
+    const affinity = data.environment?.affinity;
+    $('#results-env').textContent =
+      `Node ${data.environment?.node ?? '—'} · ${data.environment?.platform ?? '—'} · ${cpu}` +
+      (affinity ? ` · привязка к ядрам 0x${affinity}` : '') +
+      ` · токенизатор ${data.environment?.tokenizer ?? '—'}`;
+  }
+
+  const env = prefix ? $(`#${prefix}-env`) : null;
+  if (env) {
+    env.textContent =
+      `Node ${data.environment?.node ?? '—'} · ${cpu} · ` +
+      `медиана по ${fmtInt(data.engines[0]?.perf.samples?.length ?? 0)} замерам`;
+  }
 }
 
 function sourceUrl(path) {
   return `${REPO}/blob/main/${path}`;
 }
 
-function renderSetup(data) {
-  const body = $('#setup-table tbody');
+function renderSetup(selector, data) {
+  const body = $(selector);
+  if (!body) return;
   body.innerHTML = data.engines.map((e) => `
     <tr>
       <td><span class="dot-key" style="background:${e.tone}"></span><b>${e.name}</b></td>
@@ -152,14 +176,28 @@ function renderSetup(data) {
   `).join('');
 }
 
-function metricValue(engine, metric) {
-  return engine[metric];
+function renderResults(selector, data, testAttr) {
+  const body = $(selector);
+  if (!body) return;
+  body.innerHTML = data.engines.map((e) => `
+    <tr>
+      <td><span class="dot-key" style="background:${e.tone}"></span><b>${e.name}</b></td>
+      <td class="strong">${fmtInt(e.bytes)}</td>
+      <td>${fmtInt(e.gzip)}</td>
+      <td>${fmtInt(e.brotli)}</td>
+      <td data-${testAttr}="${e.id}"><span class="pill ok">${e.tests.passed}/${e.tests.total}</span></td>
+      <td>${fmtInt(e.perf.opsPerSec)}</td>
+      <td>${e.tokens ? fmtInt(e.tokens.artifact) : '—'}</td>
+    </tr>
+  `).join('');
 }
 
-function renderChart(data, metric) {
-  const max = Math.max(...data.engines.map((e) => metricValue(e, metric)));
-  $('#size-chart').innerHTML = data.engines.map((e) => {
-    const value = metricValue(e, metric);
+function renderChart(selector, data, metric) {
+  const el = $(selector);
+  if (!el) return;
+  const max = Math.max(...data.engines.map((e) => e[metric]));
+  el.innerHTML = data.engines.map((e) => {
+    const value = e[metric];
     return `
       <div class="chart-row">
         <span class="who">${e.name}</span>
@@ -170,25 +208,10 @@ function renderChart(data, metric) {
   }).join('');
 }
 
-function renderResults(data) {
-  const body = $('#results-table tbody');
-  body.innerHTML = data.engines.map((e) => `
-    <tr>
-      <td><span class="dot-key" style="background:${e.tone}"></span><b>${e.name}</b></td>
-      <td class="strong">${fmtInt(e.bytes)}</td>
-      <td>${fmtInt(e.gzip)}</td>
-      <td>${fmtInt(e.brotli)}</td>
-      <td data-engine-tests="${e.id}"><span class="pill ok">${e.tests.passed}/${e.tests.total}</span></td>
-      <td>${fmtInt(e.perf.opsPerSec)}</td>
-      <td>${e.tokens ? fmtInt(e.tokens.artifact) : '—'}</td>
-    </tr>
-  `).join('');
-}
-
 const fmtOps = (v) => `${(v / 1e6).toFixed(1).replace('.', ',')}M`;
 
-function renderSpread(data) {
-  const body = $('#spread-table tbody');
+function renderSpread(selector, data) {
+  const body = $(selector);
   if (!body) return;
   const rows = data.engines.filter((e) => e.perf.stats);
   if (!rows.length) {
@@ -210,12 +233,14 @@ function renderSpread(data) {
   }).join('');
 }
 
-function renderScatter(data) {
-  const svg = $('#scatter');
+function renderScatter(selector, data) {
+  const svg = $(selector);
+  if (!svg) return;
   const W = 640;
   const H = 300;
   const pad = { l: 46, r: 18, t: 16, b: 38 };
   const points = data.engines.filter((e) => e.tokens);
+  if (!points.length) return;
   const maxTokens = Math.max(...points.map((e) => e.tokens.artifact)) * 1.12;
   const maxBytes = Math.max(...points.map((e) => e.bytes)) * 1.15;
   const x = (v) => pad.l + (v / maxTokens) * (W - pad.l - pad.r);
@@ -244,29 +269,28 @@ function renderScatter(data) {
     <text x="${W - pad.r}" y="${H - 12}" text-anchor="end">токены артефакта →</text>
     <text x="14" y="${pad.t + 4}" transform="rotate(-90 14 ${pad.t + 4})">байты →</text>
     <text x="${pad.l}" y="${H - 12}" text-anchor="start">0</text>
-    <text x="${W - pad.r}" y="${H - 12}" text-anchor="end"></text>
     ${dots}
   `;
 }
 
 /* ── переключатель метрики ────────────────────────────────── */
 
-let metric = 'bytes';
-$$('.seg [data-metric]').forEach((btn) => {
-  btn.addEventListener('click', () => {
+function initMetric(segSelector, chartSelector, data) {
+  const seg = $(segSelector);
+  if (!seg) return;
+  let metric = 'bytes';
+  seg.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('button[data-metric]');
+    if (!btn) return;
     metric = btn.dataset.metric;
-    $$('.seg [data-metric]').forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
-    if (DATA) renderChart(DATA, metric);
+    seg.querySelectorAll('button[data-metric]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b === btn));
+    });
+    renderChart(chartSelector, data, metric);
   });
-});
+}
 
 /* ── проверка в браузере ──────────────────────────────────── */
-
-async function loadEngineBytes(engine) {
-  const res = await fetch(`projects/calculator/${engine.file}`, { cache: 'no-store' });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return new Uint8Array(await res.arrayBuffer());
-}
 
 async function instantiate(bytes) {
   if (!WebAssembly.validate(bytes)) throw new Error('invalid wasm');
@@ -279,119 +303,146 @@ async function instantiate(bytes) {
   return instance.exports;
 }
 
-$('#verify-btn').addEventListener('click', async (ev) => {
-  const btn = ev.currentTarget;
-  if (!DATA) return;
-  btn.disabled = true;
-  const status = $('#verify-status');
-  let ok = 0;
-  const problems = [];
+function initVerify({ data, dir, button, status, testAttr, missing, tests }) {
+  const btn = $(button);
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!data) return;
+    btn.disabled = true;
+    const statusEl = $(status);
+    let ok = 0;
+    const problems = [];
 
-  for (const engine of DATA.engines) {
-    const cell = $(`[data-engine-tests="${engine.id}"]`);
-    status.textContent = `проверяю ${engine.name}…`;
-    status.classList.add('run');
-    try {
-      const exports = await instantiate(await loadEngineBytes(engine));
-      const missing = missingExports(exports);
-      if (missing.length) throw new Error(`нет экспортов: ${missing.join(', ')}`);
-      const tests = runTests(exports);
-      if (tests.passed === tests.total) {
-        ok++;
-        if (cell) cell.innerHTML = `<span class="pill ok">${tests.passed}/${tests.total}</span>`;
-      } else {
-        problems.push(`${engine.name}: ${tests.failures.join('; ')}`);
-        if (cell) cell.innerHTML = `<span class="pill bad">${tests.passed}/${tests.total}</span>`;
+    for (const engine of data.engines) {
+      const cell = $(`[data-${testAttr}="${engine.id}"]`);
+      statusEl.textContent = `проверяю ${engine.name}…`;
+      statusEl.classList.add('run');
+      try {
+        const res = await fetch(`${dir}/${engine.file}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const exports = await instantiate(new Uint8Array(await res.arrayBuffer()));
+        const absent = missing(exports);
+        if (absent.length) throw new Error(`нет экспортов: ${absent.join(', ')}`);
+        const result = tests(exports);
+        if (result.passed === result.total) {
+          ok++;
+          if (cell) cell.innerHTML = `<span class="pill ok">${result.passed}/${result.total}</span>`;
+        } else {
+          problems.push(`${engine.name}: ${result.failures.join('; ')}`);
+          if (cell) cell.innerHTML = `<span class="pill bad">${result.passed}/${result.total}</span>`;
+        }
+      } catch (err) {
+        problems.push(`${engine.name}: ${err.message}`);
+        if (cell) cell.innerHTML = '<span class="pill bad">FAIL</span>';
       }
-    } catch (err) {
-      problems.push(`${engine.name}: ${err.message}`);
-      if (cell) cell.innerHTML = `<span class="pill bad">FAIL</span>`;
     }
-  }
 
-  status.classList.remove('run');
-  status.textContent = problems.length
-    ? `ошибки: ${problems.join(' · ')}`
-    : `все ${ok} сборок прошли ${DATA.engines[0].tests.total}/${DATA.engines[0].tests.total} тестов в браузере`;
-  btn.disabled = false;
-});
+    statusEl.classList.remove('run');
+    statusEl.textContent = problems.length
+      ? `ошибки: ${problems.join(' · ')}`
+      : `все ${ok} сборок прошли ${data.engines[0].tests.total}/${data.engines[0].tests.total} тестов в браузере`;
+    btn.disabled = false;
+  });
+}
 
 /* ── живой бенчмарк ───────────────────────────────────────── */
 
-$('#bench-btn').addEventListener('click', async (ev) => {
-  const btn = ev.currentTarget;
-  if (!DATA) return;
-  btn.disabled = true;
-  const status = $('#bench-status');
-  status.classList.add('run');
+function initBench({ data, dir, button, status, table, protocolUrl }) {
+  const btn = $(button);
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    if (!data) return;
+    btn.disabled = true;
+    const statusEl = $(status);
+    statusEl.textContent = 'подготовка…';
+    statusEl.classList.add('run');
 
-  const engines = DATA.engines.map((engine) => ({
-    ...engine,
-    url: `projects/calculator/${engine.file}`,
-  }));
+    const engines = data.engines.map((engine) => ({
+      ...engine,
+      url: `${dir}/${engine.file}`,
+    }));
 
-  const rows = await benchIsolated(engines, {
-    onProgress: ({ index, total, engine }) => {
-      status.textContent = `измеряю ${engine.name} (${index + 1}/${total})…`;
-    },
-  });
+    const opts = {
+      onProgress: ({ index, total, engine }) => {
+        statusEl.textContent = `измеряю ${engine.name} (${index + 1}/${total})…`;
+      },
+    };
+    if (protocolUrl) opts.protocolUrl = protocolUrl;
 
-  const ok = rows.filter((r) => r.ok && r.perf);
-  const best = ok.length ? Math.max(...ok.map((r) => r.perf.opsPerSec)) : 0;
-
-  $('#bench-table tbody').innerHTML = rows.map((r) => {
-    if (!r.ok) {
-      return `<tr><td><span class="dot-key" style="background:${r.engine.tone}"></span>${r.engine.name}</td><td colspan="4" class="quiet">${r.error}</td></tr>`;
+    let rows;
+    try {
+      rows = await benchIsolated(engines, opts);
+    } catch (err) {
+      statusEl.classList.remove('run');
+      statusEl.textContent = `ошибка: ${err.message}`;
+      btn.disabled = false;
+      return;
     }
-    const { opsPerSec, stats } = r.perf;
-    const rel = best / opsPerSec;
-    return `
-      <tr>
-        <td><span class="dot-key" style="background:${r.engine.tone}"></span><b>${r.engine.name}</b></td>
-        <td class="strong">${fmtInt(Math.round(opsPerSec))}</td>
-        <td class="quiet">${fmtInt(Math.round(stats?.min ?? opsPerSec))}</td>
-        <td class="quiet">${fmtInt(Math.round(stats?.max ?? opsPerSec))}</td>
-        <td>${rel === 1 ? 'лучший' : '×' + rel.toFixed(2)}</td>
-      </tr>
-    `;
-  }).join('');
 
-  status.classList.remove('run');
-  status.textContent = `готово · ${new Date().toLocaleTimeString('ru-RU')} · ${BENCH_PROTOCOL.rounds} раундов на сборку, отдельный Worker`;
-  btn.disabled = false;
-});
+    const ok = rows.filter((r) => r.ok && r.perf);
+    const best = ok.length ? Math.max(...ok.map((r) => r.perf.opsPerSec)) : 0;
+
+    $(table).querySelector('tbody').innerHTML = rows.map((r) => {
+      if (!r.ok) {
+        return `<tr><td><span class="dot-key" style="background:${r.engine.tone}"></span>${r.engine.name}</td><td colspan="4" class="quiet">${r.error}</td></tr>`;
+      }
+      const { opsPerSec, stats } = r.perf;
+      const rel = best / opsPerSec;
+      return `
+        <tr>
+          <td><span class="dot-key" style="background:${r.engine.tone}"></span><b>${r.engine.name}</b></td>
+          <td class="strong">${fmtInt(Math.round(opsPerSec))}</td>
+          <td class="quiet">${fmtInt(Math.round(stats?.min ?? opsPerSec))}</td>
+          <td class="quiet">${fmtInt(Math.round(stats?.max ?? opsPerSec))}</td>
+          <td>${rel === 1 ? 'лучший' : '×' + rel.toFixed(2)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    statusEl.classList.remove('run');
+    statusEl.textContent =
+      `готово · ${new Date().toLocaleTimeString('ru-RU')} · ` +
+      `${BENCH_PROTOCOL.rounds} раундов на сборку, отдельный Worker`;
+    btn.disabled = false;
+  });
+}
 
 /* ── демо ─────────────────────────────────────────────────── */
 
-function selectEngine(engines, id) {
-  const engine = engines.find((e) => e.id === id) ?? engines[0];
-  const frame = $('#demo-frame');
-  const url = engine.id === 'manual'
-    ? 'projects/calculator/index.html'
-    : `projects/calculator/index.html?engine=${engine.file}`;
-  frame.src = url;
-  $('#demo-url').textContent = url;
-  $$('#engine-tabs button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.engine === engine.id)));
-}
+function initDemo({ data, dir, tabs, frame, url }) {
+  const tabsEl = $(tabs);
+  const frameEl = $(frame);
+  if (!tabsEl || !frameEl) return;
 
-function renderDemo(data) {
-  const tabs = $('#engine-tabs');
-  tabs.innerHTML = data.engines.map((e) => `
+  tabsEl.innerHTML = data.engines.map((e) => `
     <button type="button" data-engine="${e.id}" aria-pressed="${e.id === 'manual'}">
       <span class="dot-key" style="background:${e.tone}"></span>${e.name}
     </button>
   `).join('');
-  tabs.addEventListener('click', (ev) => {
+
+  const select = (id) => {
+    const engine = data.engines.find((e) => e.id === id) ?? data.engines[0];
+    const target = engine.id === 'manual'
+      ? `${dir}/index.html`
+      : `${dir}/index.html?engine=${engine.file}`;
+    frameEl.src = target;
+    $(url).textContent = target;
+    tabsEl.querySelectorAll('button[data-engine]').forEach((b) => {
+      b.setAttribute('aria-pressed', String(b.dataset.engine === engine.id));
+    });
+  };
+
+  tabsEl.addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-engine]');
-    if (btn) selectEngine(data.engines, btn.dataset.engine);
+    if (btn) select(btn.dataset.engine);
   });
-  selectEngine(data.engines, 'manual');
+  select('manual');
 }
 
 /* ── проекты ──────────────────────────────────────────────── */
 
 function renderProjects(projects) {
-  const wrap = $('#projects');
+  const wrap = $('#projects-grid');
   wrap.innerHTML = projects.map((p) => {
     const live = p.status === 'live';
     const tags = (p.tags ?? []).map((t) => `<span>${t}</span>`).join('');
@@ -451,21 +502,90 @@ $('#copy-bib').addEventListener('click', async (ev) => {
 
 initToc();
 
-try {
-  const [calculator, projects] = await Promise.all([
-    loadJson('data/calculator.json'),
-    loadJson('data/projects.json'),
-  ]);
-  DATA = calculator;
-  PROJECTS = projects;
-  renderMeta(calculator);
-  renderSetup(calculator);
-  renderResults(calculator);
-  renderSpread(calculator);
-  renderChart(calculator, metric);
-  renderScatter(calculator);
-  renderDemo(calculator);
+const [calculatorResult, jsonResult, projectsResult] = await Promise.allSettled([
+  loadJson('data/calculator.json'),
+  loadJson('data/json.json'),
+  loadJson('data/projects.json'),
+]);
+
+const calculator = calculatorResult.status === 'fulfilled' ? calculatorResult.value : null;
+const json = jsonResult.status === 'fulfilled' ? jsonResult.value : null;
+const projects = projectsResult.status === 'fulfilled' ? projectsResult.value : null;
+
+if (calculator) {
+  renderMeta(calculator, '', { global: true });
+  renderSetup('#setup-table tbody', calculator);
+  renderResults('#results-table tbody', calculator, 'engine-tests');
+  renderSpread('#spread-table tbody', calculator);
+  renderChart('#size-chart', calculator, 'bytes');
+  renderScatter('#scatter', calculator);
+  initMetric('#calculator-metric', '#size-chart', calculator);
+  initVerify({
+    data: calculator,
+    dir: 'projects/calculator',
+    button: '#verify-btn',
+    status: '#verify-status',
+    testAttr: 'engine-tests',
+    missing: missingExports,
+    tests: runTests,
+  });
+  initDemo({
+    data: calculator,
+    dir: 'projects/calculator',
+    tabs: '#engine-tabs',
+    frame: '#demo-frame',
+    url: '#demo-url',
+  });
+  initBench({
+    data: calculator,
+    dir: 'projects/calculator',
+    button: '#bench-btn',
+    status: '#bench-status',
+    table: '#bench-table',
+  });
+} else {
+  fail(`Не удалось загрузить измерения: ${calculatorResult.reason?.message ?? 'ошибка'}. Откройте статью через локальный сервер.`);
+}
+
+if (json) {
+  renderMeta(json, 'json');
+  const updated = $('#json-updated');
+  if (updated) updated.textContent = dateRu(json.generatedAt);
+  renderSetup('#json-setup-table tbody', json);
+  renderResults('#json-results-table tbody', json, 'json-engine-tests');
+  renderSpread('#json-spread-table tbody', json);
+  renderChart('#json-size-chart', json, 'bytes');
+  renderScatter('#json-scatter', json);
+  initMetric('#json-metric', '#json-size-chart', json);
+  initVerify({
+    data: json,
+    dir: 'projects/json',
+    button: '#json-verify-btn',
+    status: '#json-verify-status',
+    testAttr: 'json-engine-tests',
+    missing: missingJsonExports,
+    tests: runJsonTests,
+  });
+  initDemo({
+    data: json,
+    dir: 'projects/json',
+    tabs: '#json-engine-tabs',
+    frame: '#json-demo-frame',
+    url: '#json-demo-url',
+  });
+  initBench({
+    data: json,
+    dir: 'projects/json',
+    button: '#json-bench-btn',
+    status: '#json-bench-status',
+    table: '#json-bench-table',
+    protocolUrl: 'assets/protocol-json.js',
+  });
+} else {
+  const status = $('#json-verify-status');
+  if (status) status.textContent = 'data/json.json недоступен — нужен локальный сервер';
+}
+
+if (projects) {
   renderProjects(projects.projects ?? projects);
-} catch (err) {
-  fail(`Не удалось загрузить измерения: ${err.message}. Откройте статью через локальный сервер.`);
 }

@@ -16,13 +16,13 @@
     {
       "slug": "json",
       "name": "JSON-парсер",
-      "status": "planned",
-      "summary": "Рекурсивный разбор с ошибками и позициями. Проверка гипотезы: растёт ли разрыв в весе и токенах при переходе от арифметики к разбору строк.",
-      "tags": ["parser", "utf-8", "error positions"],
-      "demo": null,
-      "bench": null,
-      "source": null,
-      "results": null
+      "status": "live",
+      "summary": "Байтовый разбор UTF-8 с рекурсией, escape-последовательностями и точными позициями ошибок. Проверка гипотезы: растёт ли разрыв в весе и токенах при переходе от арифметики к разбору строк.",
+      "tags": ["parser", "utf-8", "27 тестов", "6 сборок"],
+      "demo": "projects/json/index.html",
+      "bench": "projects/json/bench.html",
+      "source": "projects/json",
+      "results": "data/json.json"
     },
     {
       "slug": "regex",

@@ -20,6 +20,7 @@
       <a href="#setup">Установка</a>
       <a href="#method">Метод</a>
       <a href="#results">Результаты</a>
+      <a href="#json">JSON</a>
       <a href="#demo">Демо</a>
       <a href="#bench">Бенчмарк</a>
       <a href="#projects">Проекты</a>
@@ -40,11 +41,12 @@
         <li><a href="#setup">2 · Установка</a></li>
         <li><a href="#method">3 · Метод</a></li>
         <li><a href="#results">4 · Результаты</a></li>
-        <li><a href="#demo">5 · Демо</a></li>
-        <li><a href="#bench">6 · Бенчмарк</a></li>
-        <li><a href="#projects">7 · Проекты</a></li>
-        <li><a href="#threats">8 · Ограничения</a></li>
-        <li><a href="#reproduce">9 · Воспроизведение</a></li>
+        <li><a href="#json">5 · JSON-парсер</a></li>
+        <li><a href="#demo">6 · Демо</a></li>
+        <li><a href="#bench">7 · Бенчмарк</a></li>
+        <li><a href="#projects">8 · Проекты</a></li>
+        <li><a href="#threats">9 · Ограничения</a></li>
+        <li><a href="#reproduce">10 · Воспроизведение</a></li>
         <li><a href="#cite">Цитирование</a></li>
       </ol>
     </aside>
@@ -66,8 +68,8 @@
 
       <div class="keyfigs" aria-label="Ключевые числа">
         <div class="kf"><b>6</b><span>сборок одной логики</span></div>
-        <div class="kf"><b>17</b><span>функций в общем API</span></div>
-        <div class="kf"><b>17</b><span>тестов на каждую сборку</span></div>
+        <div class="kf"><b>2</b><span>проекта серии</span></div>
+        <div class="kf"><b>44</b><span>теста на каждую сборку</span></div>
         <div class="kf"><b id="kf-min">1164 Б</b><span>минимальный .wasm</span></div>
         <div class="kf"><b id="kf-tokens">3006</b><span>токенов у ручного WAT</span></div>
       </div>
@@ -77,6 +79,7 @@
         <div>
           <p>Может ли языковая модель писать WebAssembly-байткод напрямую, без исходного языка и компилятора? Этот артефакт измеряет цену такого подхода на одном прикладном примере: калькуляторе с фиксированным API из 17 функций и одинаковым поведением.</p>
           <p>Сравниваются шесть сборок: байткод, написанный моделью, и реализации на Rust, AssemblyScript, C и C++ — последний в двух вариантах, с оптимизацией по размеру (<code>-Oz</code>) и по скорости (<code>-O3</code>). Для каждой измеряются токены артефакта, корректность на общем наборе тестов, размер модуля и скорость выполнения. Результат: самый маленький модуль в сырых байтах — у AssemblyScript (<span data-stat="min-bytes">1164</span> Б), но после gzip и brotli первым становится ручной байткод (<span data-stat="min-gzip">610</span> и <span data-stat="min-brotli">574</span> Б). Ручной WAT требует в <span data-stat="token-ratio">1,9–2,5</span> раза больше токенов, чем исходники на C или C++. По скорости все шесть сборок укладываются в <span data-stat="perf-spread">1,15</span> раза; в парных замерах ручной модуль уступает C++ <code>-O3</code> около 3 %, а прочие пары, кроме C++ <code>-Oz</code>/<code>-O3</code>, неразличимы. Компиляторы выигрывают по стоимости авторинга, ручной байткод — по сжатому весу.</p>
+          <p>Второй проект — JSON-парсер с 27 тестами — проверяет, что происходит с этим балансом при переходе от арифметики к разбору строк. Там ручной байткод уже не выигрывает ни в сырых байтах, ни после сжатия, а разрыв по токенам растёт до <span data-stat="json-token-ratio">2,3–2,9</span> раза. Скорость шести сборок остаётся в пределах <span data-stat="json-perf-spread">1,11</span> раза.</p>
         </div>
       </section>
 
@@ -156,7 +159,7 @@ error() → i32        operand() → f64    leftOperand() → f64
           <li><em class="term">Токены артефакта</em> — <code>countTokens</code> (o200k_base) от естественной формы: исходник на языке реализации или WAT для ручного байткода. Это нижняя граница стоимости генерации: модель ещё тратит токены на рассуждение, ошибки и правки.</li>
           <li><em class="term">Токены генерации</em> — <code>usage.output_tokens</code> конкретного прогона. В v0.1 не измерялись; протокол для будущих прогонов описан ниже.</li>
           <li><em class="term">Тесты</em> — 16 сценариев ввода/арифметики и одна проверка формулы после <code>=</code>. Один и тот же код выполняется в Node и в браузере.</li>
-          <li><em class="term">ops/sec</em> — вызовы API в секунду на детерминированной нагрузке. Каждая сборка измеряется в отдельном процессе Node: прогрев 750 мс, затем десять окон по 150 мс, шесть таких процессов; медиана по всем <span data-stat="samples">60</span> замерам. Рядом с медианой публикуются минимум, среднее, максимум и стандартное отклонение — они показывают шум, который медиана скрывает.</li>
+          <li><em class="term">ops/sec</em> — вызовы API в секунду на детерминированной нагрузке. Каждая сборка измеряется в отдельном процессе Node: прогрев 750 мс, затем десять окон по 150 мс, шесть таких процессов; медиана по всем <span data-stat="samples">60</span> замерам. Рядом с медианой публикуются минимум, среднее, максимум и стандартное отклонение — они показывают шум, который медиана скрывает. Для JSON-парсера одна операция — разбор одного документа, поэтому единица в таблице — документы в секунду; протокол и число замеров те же.</li>
           <li><em class="term">Размер</em> — байты модуля, gzip уровня 9 и brotli качества 11.</li>
         </ul>
 
@@ -195,7 +198,7 @@ error() → i32        operand() → f64    leftOperand() → f64
         <p class="lede">Самый маленький сжатый модуль стоит самых дорогих токенов.</p>
 
         <div class="toolbar">
-          <div class="seg" role="group" aria-label="Метрика веса">
+          <div class="seg" id="calculator-metric" role="group" aria-label="Метрика веса">
             <button type="button" data-metric="bytes" aria-pressed="true">.wasm</button>
             <button type="button" data-metric="gzip" aria-pressed="false">gzip</button>
             <button type="button" data-metric="brotli" aria-pressed="false">brotli</button>
@@ -259,8 +262,143 @@ error() → i32        operand() → f64    leftOperand() → f64
       </section>
 
       <!-- 5 ─────────────────────────────────────────────────── -->
+      <section class="chapter" id="json">
+        <h2><span class="num">5</span> JSON-парсер</h2>
+        <p class="lede">Второй проект: рекурсия, UTF-8, escape-последовательности и ошибки с позициями — на том же контракте из шести сборок.</p>
+
+        <p>Калькулятор проверяет состояние и арифметику. JSON-парсер добавляет то, чего в нём нет: цикл по входному буферу, рекурсивный спуск, декодирование строк, <code>\u</code>-escape с суррогатными парами, числа с плавающей точкой и точную позицию первой ошибки. Интерфейс остаётся байтовым: страница копирует UTF-8 в память модуля, вызывает <code>json_parse(len)</code> и читает счётчики. Ни одна сборка ничего не импортирует.</p>
+
+        <h3>Контракт API</h3>
+        <pre><code>json_input_ptr() → i32          // входной буфер, 64 КиБ
+json_parse(len) → i32           // 0 — успех, иначе код ошибки
+json_error_pos() → i32
+json_error_code() → i32
+json_root_type() → i32          // 0 null · 1 false · 2 true · 3 number · 4 string · 5 array · 6 object
+json_root_number() → f64
+json_root_len() → i32
+json_root_ptr() → i32
+json_nodes() · json_depth() · json_numbers()
+json_strings() · json_string_bytes()</code></pre>
+
+        <p>27 общих тестов: 13 корректных документов и 14 некорректных. Проверяются коды ошибок и их позиции, поэтому «угадать» ответ нельзя. Счётчики структуры — узлы, глубина, числа, строки и байты декодированных строк — считаются одинаково: контейнер тоже узел, ключи объекта входят в число строк, глубина начинается с единицы. Лимиты — 64 КиБ входа, 4 КиБ корневой строки и глубина 64.</p>
+
+        <div class="table-wrap">
+          <table class="data" id="json-setup-table">
+            <thead>
+              <tr><th>Реализация</th><th>Как получена</th><th>Инструменты</th><th>Исходник</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="4" class="quiet">Загрузка реестра…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>Результаты</h3>
+
+        <div class="toolbar">
+          <div class="seg" id="json-metric" role="group" aria-label="Метрика веса JSON-сборок">
+            <button type="button" data-metric="bytes" aria-pressed="true">.wasm</button>
+            <button type="button" data-metric="gzip" aria-pressed="false">gzip</button>
+            <button type="button" data-metric="brotli" aria-pressed="false">brotli</button>
+          </div>
+          <button class="btn" id="json-verify-btn" type="button">Проверить сборки в браузере</button>
+        </div>
+
+        <figure>
+          <div class="chart-rows" id="json-size-chart" aria-label="Размер JSON-модулей"></div>
+          <figcaption><b>Рис. 3.</b> Размер модуля JSON-парсера. Шкала нормирована на максимум в выбранной метрике.</figcaption>
+        </figure>
+
+        <div class="table-wrap">
+          <table class="data" id="json-results-table">
+            <thead>
+              <tr>
+                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th>
+                <th>Тесты</th><th>док./с (медиана)</th><th>Токены</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="7" class="quiet">Загрузка измерений…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="live-status" id="json-verify-status" role="status">Данные из <code>data/json.json</code> от <span id="json-updated">…</span>, собранные Node-бенчмарком.</p>
+
+        <p>Одна операция нагрузки — разбор одного документа; за проход проходят 13 документов: объекты, массивы, вложенность, экспоненциальная запись чисел, escape-последовательности, суррогатные пары и все корневые типы. Медиана по <span data-stat="json-samples">60</span> замерам на сборку; σ — <span data-stat="json-noise-min">1,5</span>–<span data-stat="json-noise-max">3,8</span> % от медианы.</p>
+
+        <div class="table-wrap">
+          <table class="data" id="json-spread-table">
+            <thead>
+              <tr>
+                <th>Реализация</th><th>мин</th><th>среднее</th><th>медиана</th><th>макс</th><th>σ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="quiet">Загрузка измерений…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="live-status">Числа — миллионы документов в секунду (M док./с); σ — стандартное отклонение по всем замерам сборки.</p>
+
+        <figure>
+          <svg class="scatter" id="json-scatter" viewBox="0 0 640 300" role="img" aria-label="Токены артефакта против размера JSON-модуля"></svg>
+          <figcaption><b>Рис. 4.</b> Токены артефакта (ось X) против размера модуля (ось Y) для JSON-парсера. Ручной WAT — крайняя правая точка; в отличие от калькулятора, он уже не выигрывает и по весу.</figcaption>
+        </figure>
+
+        <h3>Наблюдения</h3>
+        <ul>
+          <li><b>Вес.</b> В сырых байтах лидирует AssemblyScript — 3 190 Б; ручной байткод занимает 3 271 Б (+2,5 %). После gzip и brotli AssemblyScript по-прежнему первый (1 378 и 1 259 Б), ручной модуль — второй (1 385 и 1 268 Б, +0,5 % и +0,7 %). Дальше C (4 137 Б; 1 866 и 1 644 Б), C++ <code>-Oz</code> (4 676 Б; 2 045 и 1 803 Б), Rust (4 699 Б; 2 038 и 1 843 Б) и C++ <code>-O3</code> (5 701 Б; 2 280 и 2 012 Б). Проигрыш ручного байткода по сырым байтам — 2,5 %, по сжатым — меньше процента.</li>
+          <li><b>Токены.</b> Дешевле всего писать на C (3 303 токена) и C++ (3 400 — один исходник на два варианта), дороже — AssemblyScript (3 828) и Rust (4 135). Ручной WAT требует 9 556 токенов — в <span data-stat="json-token-ratio">2,3–2,9</span> раза больше компилируемых вариантов. В base64 картина иная: 2 524 токена у AssemblyScript, 2 599 у ручного модуля, 3 219 у C, 3 728 и 4 532 у C++ <code>-Oz</code>/<code>-O3</code>.</li>
+          <li><b>Скорость.</b> Шесть сборок укладываются в <span data-stat="json-perf-spread">1,11</span> раза: от <span data-stat="json-ops-min">2,6</span>M до <span data-stat="json-ops-max">2,9</span>M документов в секунду. Быстрее всех C++ <code>-O3</code>; ручной байткод — последний. Разница <code>-O3</code> к <code>-Oz</code> — около +<span data-stat="json-cpp-gain">8</span> % при +<span data-stat="json-cpp-size">22</span> % сырых байт. Парных блоков для JSON не проводилось, поэтому различия меньше 2–3 % здесь не разрешаются.</li>
+          <li><b>Корректность.</b> Все шесть сборок проходят 27/27 тестов, включая позиции ошибок для 14 некорректных документов. Общий оракул считает структуру по эталонному разбору, поэтому расхождение в счётчиках или позиции сразу видно.</li>
+          <li><b>Что изменилось относительно калькулятора.</b> Ручной байткод перестал быть самым лёгким: на рекурсивном разборе строк AssemblyScript выигрывает и в сырых байтах, и после сжатия. Разрыв по токенам вырос с 1,9–2,5 до 2,3–2,9 раза, а скорость осталась ровной — 1,11 раза между лучшей и худшей сборкой.</li>
+        </ul>
+
+        <div class="callout">
+          <p><b>Вывод.</b> Переход от арифметики к разбору строк усиливает главный компромисс: ручной байткод остаётся конкурентоспособным по скорости и почти догоняет лучший сжатый размер, но стоит в 2,3–2,9 раза больше токенов. AssemblyScript на этой задаче — самый дешёвый по авторингу и самый маленький по весу; C++ <code>-O3</code> — самый быстрый, но самый тяжёлый.</p>
+        </div>
+
+        <h3>Демо</h3>
+        <div class="engine-tabs" id="json-engine-tabs" role="group" aria-label="Выбор реализации JSON-парсера"></div>
+
+        <div class="demo-frame">
+          <div class="demo-chrome">
+            <span class="lamp"></span><span class="lamp"></span><span class="lamp"></span>
+            <span class="url" id="json-demo-url">projects/json/index.html</span>
+          </div>
+          <iframe id="json-demo-frame" src="projects/json/index.html" title="JSON-парсер на WebAssembly" loading="lazy"></iframe>
+        </div>
+        <figcaption style="margin-top:8px;padding:0;border:0;background:none">JSON-парсер доступен и отдельно: <a href="projects/json/index.html">projects/json/</a>. Демо показывает разобранное корневое значение, счётчики структуры и фрагмент документа с кареткой на позиции ошибки.</figcaption>
+
+        <h3>Бенчмарк в браузере</h3>
+        <p>Та же нагрузка из 13 документов, но в вашем браузере: каждая сборка получает отдельный Worker, прогрев 500 мс и семь раундов по 150 мс. Числа — документы в секунду; сравнивать имеет смысл реализации между собой внутри одного запуска.</p>
+
+        <div class="live-head">
+          <button class="btn primary" id="json-bench-btn" type="button">Запустить бенчмарк JSON</button>
+          <span class="live-status" id="json-bench-status" role="status">не запускался</span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="data" id="json-bench-table">
+            <thead>
+              <tr><th>Реализация</th><th>медиана</th><th>мин</th><th>макс</th><th>к лучшему</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="5" class="quiet">Нажмите «Запустить бенчмарк JSON».</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="notes">
+          <span>Методика: <code>benchmark()</code> из <code>assets/protocol-json.js</code>; изоляция — <code>bench-client.js</code> + <code>bench-worker.js</code>.</span>
+          <span>Node-числа получены на <span data-stat="json-cpu">этой машине</span> и сохранены в <code>data/json.json</code>.</span>
+          <span>Окружение JSON-прогона: <span id="json-env">—</span>.</span>
+        </p>
+      </section>
+
+      <!-- 6 ─────────────────────────────────────────────────── -->
       <section class="chapter" id="demo">
-        <h2><span class="num">5</span> Демо</h2>
+        <h2><span class="num">6</span> Демо</h2>
         <p class="lede">Один интерфейс, шесть движков. Переключение не меняет ни одной строки UI-кода.</p>
 
         <div class="engine-tabs" id="engine-tabs" role="group" aria-label="Выбор реализации"></div>
@@ -277,9 +415,9 @@ error() → i32        operand() → f64    leftOperand() → f64
         <p>Интерфейс калькулятора не знает о языках: он вызывает экспорты, а <code>?engine=</code> указывает, какой модуль загрузить. Это и есть практическая проверка контракта — если сборка ведёт себя иначе, её видно руками за пару нажатий.</p>
       </section>
 
-      <!-- 6 ─────────────────────────────────────────────────── -->
+      <!-- 7 ─────────────────────────────────────────────────── -->
       <section class="chapter" id="bench">
-        <h2><span class="num">6</span> Бенчмарк</h2>
+        <h2><span class="num">7</span> Бенчмарк</h2>
         <p class="lede">Та же нагрузка, но исполняется в вашем браузере прямо сейчас.</p>
 
         <p>Кнопка ниже загружает все шесть модулей и выполняет одинаковую нагрузку — 76 вызовов API за проход. Каждая сборка измеряется в своём Worker: прогрев 500 мс, семь раундов по 150 мс; в таблице — медиана и коридор от минимума до максимума. Worker завершается до старта следующей сборки, поэтому модули не конкурируют за один JIT. Числа браузера не совпадут с Node: другой JIT, другая машина, другой тепловой режим. Сравнивать имеет смысл реализации между собой внутри одного запуска.</p>
@@ -306,63 +444,68 @@ error() → i32        operand() → f64    leftOperand() → f64
         </p>
       </section>
 
-      <!-- 7 ─────────────────────────────────────────────────── -->
+      <!-- 8 ─────────────────────────────────────────────────── -->
       <section class="chapter" id="projects">
-        <h2><span class="num">7</span> Проекты</h2>
-        <p class="lede">Артефакт спроектирован как серия: калькулятор — первая, самая простая точка.</p>
+        <h2><span class="num">8</span> Проекты</h2>
+        <p class="lede">Артефакт спроектирован как серия: калькулятор и JSON-парсер уже измерены, regex и стековая VM — следующие.</p>
 
-        <div class="projects" id="projects">
+        <div class="projects" id="projects-grid">
           <div class="project"><p class="quiet">Загрузка реестра…</p></div>
         </div>
 
-        <p>Каждый проект получает каталог <code>projects/&lt;slug&gt;/</code>, свой реестр реализаций и файл измерений. Статья подхватывает проект из <code>data/projects.json</code> и добавляет строку в таблицу и карточку в этот раздел. Следующие приложения добавят то, чего нет в калькуляторе: парсинг строк, регулярные выражения и интерпретацию байткода — там вес и корректность важнее, чем в арифметике.</p>
+        <p>Каждый проект получает каталог <code>projects/&lt;slug&gt;/</code>, свой реестр реализаций и файл измерений. Статья подхватывает проект из <code>data/projects.json</code> и добавляет карточку в этот раздел. JSON-парсер добавил то, чего нет в калькуляторе: разбор строк, рекурсию и позиции ошибок. Следующие приложения добавят регулярные выражения и интерпретацию байткода — там вес, корректность и защита от катастрофического бэктрекинга важнее, чем в арифметике.</p>
       </section>
 
-      <!-- 8 ─────────────────────────────────────────────────── -->
+      <!-- 9 ─────────────────────────────────────────────────── -->
       <section class="chapter" id="threats">
-        <h2><span class="num">8</span> Ограничения</h2>
+        <h2><span class="num">9</span> Ограничения</h2>
         <p class="lede">Что может сломать выводы — и что для этого нужно сделать.</p>
 
         <ul>
-          <li><b>Один проект, шесть сборок.</b> Калькулятор — маленькая state machine. Переносить числа на парсеры и интерпретаторы без новых измерений нельзя; это и есть RQ5.</li>
+          <li><b>Два проекта, шесть сборок.</b> Калькулятор — маленькая state machine, JSON-парсер — рекурсивный разбор строк. Оба показывают схожую картину по скорости, но противоположную по весу; переносить числа на regex и интерпретатор байткода без новых измерений всё ещё нельзя. Это и есть RQ5.</li>
           <li><b>Токены артефакта — не стоимость генерации.</b> Они не включают рассуждение, отвергнутые варианты и отладку. Реальная цена может быть в разы выше; для её измерения нужен лог <code>usage.output_tokens</code>.</li>
-          <li><b>WAT — форма авторинга.</b> Ручной модуль написан как WAT и собран <code>wasm-as</code>; 3 006 токенов считаются по этой форме. Другая запись (инструкции, base64) дала бы другое число, но не меняет порядок величины.</li>
+          <li><b>WAT — форма авторинга.</b> Ручной модуль написан как WAT и собран <code>wasm-as</code>; 3 006 токенов у калькулятора и 9 556 у JSON-парсера считаются по этой форме. Другая запись (инструкции, base64) дала бы другое число, но не меняет порядок величины.</li>
           <li><b>Микробенчмарк.</b> Доминируют накладные расходы вызова JS → wasm. Разница между <code>-Oz</code> и <code>-O3</code> на таком объёме кода мала и может измениться при другой нагрузке.</li>
           <li><b>Одно окружение.</b> Node 24 на одной машине; заголовочное число — медиана по <span data-stat="samples">60</span> замерам, шум показан минимумом, максимумом и σ. Парные сравнения в тексте используют бутстреп-интервалы, но остаются измерением на одной машине. Браузерный запуск — независимая, но не идентичная проверка.</li>
-          <li><b>Поведенческие тесты, не формальная верификация.</b> 17 проверок покрывают заявленное поведение, но не доказывают отсутствие ошибок на всех входах. Fuzzing и сравнение с эталонной моделью — следующий шаг.</li>
+          <li><b>Поведенческие тесты, не формальная верификация.</b> 17 проверок калькулятора и 27 проверок JSON-парсера покрывают заявленное поведение, но не доказывают отсутствие ошибок на всех входах. Fuzzing и сравнение с эталонной моделью — следующий шаг.</li>
           <li><b>Разные тулчейны.</b> Компиляторы получают <code>-Oz</code> и <code>wasm-opt</code>; C++ дополнительно собран с <code>-O3</code> как отдельный артефакт, чтобы отделить размер от скорости. Ручной модуль переписан вручную под скорость — без автоматических оптимизаторов вроде <code>wasm-opt</code>. Это ближе к реальному использованию, но не идеально контролируемый эксперимент.</li>
         </ul>
       </section>
 
-      <!-- 9 ─────────────────────────────────────────────────── -->
+      <!-- 10 ────────────────────────────────────────────────── -->
       <section class="chapter" id="reproduce">
-        <h2><span class="num">9</span> Воспроизведение</h2>
-        <p class="lede">Все числа в статье пересчитываются двумя командами.</p>
+        <h2><span class="num">10</span> Воспроизведение</h2>
+        <p class="lede">Все числа в статье пересчитываются двумя командами на проект.</p>
 
         <pre><code>git clone https://github.com/knyazevs/tokens-to-bytes
 cd tokens-to-bytes
 npm install
 
-npm run tokens       # data/tokens.json  — токены артефактов
-npm run measure      # data/calculator.json — размер, тесты, ops/sec
-npm run build:manual # calc.wasm из calc.wat через wasm-as
-npm run build:cpp    # обе C++-сборки: -Oz и -O3</code></pre>
+npm run tokens              # data/tokens.json — токены калькулятора
+npm run measure             # data/calculator.json — размер, тесты, ops/sec
+npm run tokens -- json      # data/tokens-json.json — токены JSON-парсера
+npm run measure -- json     # data/json.json — размер, тесты, док./с
+npm run build:manual        # calc.wasm из calc.wat через wasm-as
+npm run build:json          # шесть сборок JSON-парсера</code></pre>
 
-        <p>Замер на гибридном процессоре стоит привязывать к P-ядрам, иначе Windows может перенести процесс на E-ядра посреди прогона: <code>AFFINITY=FFF</code> в окружении и <code>start /affinity FFF</code> для запуска. Привязка попадёт в <code>data/calculator.json</code> вместе с методом.</p>
+        <p>Замер на гибридном процессоре стоит привязывать к P-ядрам, иначе Windows может перенести процесс на E-ядра посреди прогона: <code>AFFINITY=FFF</code> в окружении и <code>start /affinity FFF</code> для запуска. Привязка попадёт в файл измерений проекта вместе с методом.</p>
 
         <p>Для пересборки wasm из исходников нужны Rust с таргетом <code>wasm32-unknown-unknown</code>, AssemblyScript, clang с <code>wasm-ld</code>, <code>wasm-opt</code> и <code>wasm-as</code> из Binaryen. Точные команды и конфиги лежат в <code>builds/</code>; готовые бинарники уже в репозитории, поэтому для проверки измерений тулчейны не нужны.</p>
 
         <pre class="tree"><code>tokens-to-bytes/
 ├─ index.html                 статья
-├─ assets/                    стили, скрипты, общий протокол
+├─ assets/                    стили, скрипты, общие протоколы
 ├─ data/
 │  ├─ projects.json           реестр проектов
 │  ├─ calculator.json         измерения калькулятора
-│  └─ tokens.json             токены артефактов
+│  ├─ json.json               измерения JSON-парсера
+│  ├─ tokens.json             токены калькулятора
+│  └─ tokens-json.json        токены JSON-парсера
 ├─ projects/calculator/       демо + шесть wasm + WAT
+├─ projects/json/             демо + шесть wasm + WAT
 └─ builds/                    исходники, сборка, измерение</code></pre>
 
-        <p>Любая сборка запускается в демо отдельно: <code>projects/calculator/index.html?engine=calc-rust.wasm</code>. Страница бенчмарка проекта: <a href="projects/calculator/bench.html">projects/calculator/bench.html</a>.</p>
+        <p>Любая сборка запускается в демо отдельно: <code>projects/json/index.html?engine=json-rust.wasm</code>. Страницы бенчмарков: <a href="projects/calculator/bench.html">projects/calculator/bench.html</a> и <a href="projects/json/bench.html">projects/json/bench.html</a>.</p>
       </section>
 
       <!-- cite ──────────────────────────────────────────────── -->

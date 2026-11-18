@@ -1,12 +1,13 @@
-// Измеряет все реализации калькулятора и пишет data/calculator.json:
+// Измеряет все реализации проекта и пишет его data-файл:
 // размер, gzip/brotli, тесты, производительность, токены.
+//
+//   node builds/measure.mjs            калькулятор (по умолчанию)
+//   node builds/measure.mjs json       JSON-парсер
 //
 // Производительность меряется в изолированных процессах (builds/bench-one.mjs):
 // один Node-процесс — одна сборка. Если держать несколько горячих wasm-модулей
 // в одном процессе, V8 не успевает поднять оптимизацию для всех, и последняя
 // измеряемая сборка проседает в 2–3 раза. Это артефакт замера, а не кода.
-//
-//   node builds/measure.mjs
 
 import fs from 'node:fs';
 import os from 'node:os';
@@ -14,17 +15,19 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { gzipSync, brotliCompressSync, constants } from 'node:zlib';
-import { ENGINES } from './engines.mjs';
-import { describeStats } from '../assets/protocol.js';
+import { projectBySlug, PROJECTS } from './projects.mjs';
+import { describeStats } from '../assets/bench-core.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const slug = PROJECTS[process.argv[2]] ? process.argv[2] : 'calculator';
+const project = projectBySlug(slug);
 const benchOne = path.join(root, 'builds', 'bench-one.mjs');
-const outFile = path.join(root, 'data', 'calculator.json');
-const tokensFile = path.join(root, 'data', 'tokens.json');
+const outFile = path.join(root, project.out);
+const tokensFile = path.join(root, project.tokens);
 
 const REPEATS = Number(process.env.REPEATS ?? 6);
 const affinity = process.env.AFFINITY ?? null;
-const BENCH = { warmupMs: 750, rounds: 10, durationMs: 150 };
+const BENCH = project.bench;
 
 const tokens = fs.existsSync(tokensFile)
   ? JSON.parse(fs.readFileSync(tokensFile, 'utf8'))
@@ -38,7 +41,7 @@ function measureIsolated(engine) {
   let tests = null;
 
   for (let i = 0; i < REPEATS; i++) {
-    const result = spawnSync(process.execPath, [benchOne, engine.id], {
+    const result = spawnSync(process.execPath, [benchOne, slug, engine.id], {
       cwd: root,
       encoding: 'utf8',
       env: {
@@ -65,8 +68,8 @@ function measureIsolated(engine) {
 
 const engines = [];
 
-for (const engine of ENGINES) {
-  const filePath = path.join(root, 'projects/calculator', engine.file);
+for (const engine of project.engines) {
+  const filePath = path.join(root, project.dir, engine.file);
   const bytes = fs.readFileSync(filePath);
   if (!WebAssembly.validate(bytes)) throw new Error(`${engine.file}: invalid wasm`);
 
@@ -115,7 +118,7 @@ for (const engine of ENGINES) {
 }
 
 const result = {
-  project: 'calculator',
+  project: project.slug,
   protocol: 4,
   method:
     `process-per-build: ${BENCH.warmupMs} ms warmup, ${BENCH.rounds} rounds x ${BENCH.durationMs} ms, ` +
