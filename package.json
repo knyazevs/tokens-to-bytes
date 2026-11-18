@@ -1,6 +1,6 @@
 {
   "name": "tokens-to-bytes",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Research artifact: cost, correctness and competitiveness of LLM-synthesized WebAssembly",
@@ -8,6 +8,7 @@
   "scripts": {
     "tokens": "node builds/tokens.mjs",
     "measure": "node builds/measure.mjs",
+    "paired": "node builds/paired.mjs",
     "bench:one": "node builds/bench-one.mjs",
     "build:cpp": "node builds/build-cpp.mjs",
     "build:manual": "node builds/build-manual.mjs",

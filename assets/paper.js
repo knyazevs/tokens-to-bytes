@@ -225,7 +225,8 @@ function renderChart(selector, data, metric) {
 const fmtOps = (v) => {
   const scale = v >= 1e6 ? 1e6 : 1e3;
   const unit = scale === 1e6 ? 'M' : 'k';
-  return `${(v / scale).toFixed(1).replace('.', ',')}${unit}`;
+  const digits = scale === 1e6 && v < 2e6 ? 2 : 1;
+  return `${(v / scale).toFixed(digits).replace('.', ',')}${unit}`;
 };
 
 function renderSpread(selector, data) {
@@ -246,6 +247,43 @@ function renderSpread(selector, data) {
         <td class="strong">${fmtOps(s.median)}</td>
         <td>${fmtOps(s.max)}</td>
         <td class="quiet">${fmtOps(s.stddev)}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function signedPct(ratio) {
+  const value = (ratio - 1) * 100;
+  const sign = value > 0 ? '+' : value < 0 ? '−' : '';
+  return `${sign}${Math.abs(value).toFixed(1).replace('.', ',')} %`;
+}
+
+function renderPaired(selector, sets) {
+  const body = $(selector);
+  if (!body) return;
+  if (sets.every((set) => !set)) {
+    body.innerHTML = '<tr><td colspan="5" class="quiet">Парные данные недоступны — нужен локальный сервер.</td></tr>';
+    return;
+  }
+  const order = ['manual', 'rust', 'as', 'c', 'cpp', 'cpp-opt'];
+  const names = new Map();
+  for (const set of sets) {
+    if (!set) continue;
+    for (const e of set.engines) names.set(e.id, e.name);
+  }
+  body.innerHTML = order.map((id) => {
+    const cells = sets.map((set) => {
+      if (!set) return '<td class="quiet">—</td>';
+      const e = set.engines.find((x) => x.id === id);
+      if (!e) return '<td class="quiet">—</td>';
+      if (id === set.reference) return '<td class="quiet">—</td>';
+      const r = e.ratio;
+      return `<td><b>${signedPct(r.median)}</b><span class="ci">[${signedPct(r.lo)}; ${signedPct(r.hi)}] · ${r.wins}/${r.total}</span></td>`;
+    }).join('');
+    return `
+      <tr>
+        <td><b>${names.get(id) ?? id}</b></td>
+        ${cells}
       </tr>
     `;
   }).join('');
@@ -528,6 +566,17 @@ const [calculatorResult, jsonResult, regexResult, vmResult, projectsResult] = aw
   loadJson('data/projects.json'),
 ]);
 
+const pairedFiles = ['calculator', 'json', 'regex', 'vm'];
+const pairedResults = await Promise.allSettled(
+  pairedFiles.map((slug) => loadJson(`data/paired-${slug}.json`)),
+);
+const paired = Object.fromEntries(
+  pairedFiles.map((slug, i) => [
+    slug,
+    pairedResults[i].status === 'fulfilled' ? pairedResults[i].value : null,
+  ]),
+);
+
 const calculator = calculatorResult.status === 'fulfilled' ? calculatorResult.value : null;
 const json = jsonResult.status === 'fulfilled' ? jsonResult.value : null;
 const regex = regexResult.status === 'fulfilled' ? regexResult.value : null;
@@ -541,6 +590,12 @@ if (calculator) {
   renderSpread('#spread-table tbody', calculator);
   renderChart('#size-chart', calculator, 'bytes');
   renderScatter('#scatter', calculator);
+  renderPaired('#paired-table tbody', [
+    paired.calculator,
+    paired.json,
+    paired.regex,
+    paired.vm,
+  ]);
   initMetric('#calculator-metric', '#size-chart', calculator);
   initVerify({
     data: calculator,

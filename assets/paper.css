@@ -285,6 +285,47 @@ h1 .dim { color: var(--muted); }
 }
 .abstract p { margin: 0; font-size: 17.5px; line-height: 1.6; }
 .abstract p + p { margin-top: 10px; }
+.abstract + .abstract { margin-top: 18px; }
+.abstract .keywords {
+  margin-top: 14px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.abstract .keywords b { color: var(--ink); }
+.ci {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 10.5px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+/* ── литература и заявления ────────────────────────────────── */
+
+ol.refs {
+  margin: 0;
+  padding-left: 22px;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+ol.refs li { margin: 8px 0; padding-left: 4px; }
+ol.refs li:target { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+ol.refs a { color: var(--accent-2); text-decoration: none; }
+ol.refs a:hover { text-decoration: underline; }
+.statements { display: grid; gap: 10px; margin: 0; }
+.statements div {
+  padding: 12px 14px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: var(--card);
+}
+.statements dt { color: var(--muted); font-family: var(--sans); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+.statements dd { margin: 5px 0 0; font-size: 14px; line-height: 1.55; }
 
 /* ── секции ─────────────────────────────────────────────────── */
 

@@ -1,0 +1,413 @@
+{
+  "project": "regex",
+  "generatedAt": "2026-11-18T23:08:21.551Z",
+  "seed": 20261119,
+  "blocks": 12,
+  "reference": "cpp-opt",
+  "method": "paired randomized blocks: 12 blocks, each block measures every build once in a randomized order; one fresh Node process per build (750 ms warmup, 10 rounds x 150 ms); ratio = build ops/sec / cpp-opt ops/sec within the same block; median ratio with 10 000-resample bootstrap 95% interval; wins = blocks where build is faster than reference",
+  "environment": {
+    "node": "v24.20.0",
+    "platform": "win32 x64",
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12600KF"
+  },
+  "runs": [
+    {
+      "index": 0,
+      "order": [
+        "cpp-opt",
+        "manual",
+        "as",
+        "cpp",
+        "rust",
+        "c"
+      ],
+      "medians": {
+        "cpp-opt": 1289305,
+        "manual": 1156879,
+        "as": 1050749,
+        "cpp": 1224971,
+        "rust": 1219942,
+        "c": 1277605
+      }
+    },
+    {
+      "index": 1,
+      "order": [
+        "rust",
+        "manual",
+        "cpp-opt",
+        "as",
+        "cpp",
+        "c"
+      ],
+      "medians": {
+        "rust": 1255619,
+        "manual": 1140156,
+        "cpp-opt": 1288329,
+        "as": 1060547,
+        "cpp": 1258970,
+        "c": 1268168
+      }
+    },
+    {
+      "index": 2,
+      "order": [
+        "as",
+        "c",
+        "manual",
+        "cpp-opt",
+        "rust",
+        "cpp"
+      ],
+      "medians": {
+        "as": 1054166,
+        "c": 1266889,
+        "manual": 1144150,
+        "cpp-opt": 1272775,
+        "rust": 1258943,
+        "cpp": 1272891
+      }
+    },
+    {
+      "index": 3,
+      "order": [
+        "rust",
+        "as",
+        "cpp",
+        "c",
+        "manual",
+        "cpp-opt"
+      ],
+      "medians": {
+        "rust": 1255641,
+        "as": 1052147,
+        "cpp": 1255593,
+        "c": 1267468,
+        "manual": 1147158,
+        "cpp-opt": 1271460
+      }
+    },
+    {
+      "index": 4,
+      "order": [
+        "rust",
+        "cpp-opt",
+        "manual",
+        "c",
+        "as",
+        "cpp"
+      ],
+      "medians": {
+        "rust": 1254209,
+        "cpp-opt": 1278008,
+        "manual": 1159151,
+        "c": 1278144,
+        "as": 1045973,
+        "cpp": 1254145
+      }
+    },
+    {
+      "index": 5,
+      "order": [
+        "c",
+        "manual",
+        "cpp-opt",
+        "as",
+        "cpp",
+        "rust"
+      ],
+      "medians": {
+        "c": 1264124,
+        "manual": 1111664,
+        "cpp-opt": 1258145,
+        "as": 1053267,
+        "cpp": 1265760,
+        "rust": 1267449
+      }
+    },
+    {
+      "index": 6,
+      "order": [
+        "c",
+        "rust",
+        "cpp",
+        "as",
+        "manual",
+        "cpp-opt"
+      ],
+      "medians": {
+        "c": 1275671,
+        "rust": 1261592,
+        "cpp": 1260997,
+        "as": 1052356,
+        "manual": 1155931,
+        "cpp-opt": 1277686
+      }
+    },
+    {
+      "index": 7,
+      "order": [
+        "rust",
+        "cpp-opt",
+        "c",
+        "cpp",
+        "as",
+        "manual"
+      ],
+      "medians": {
+        "rust": 1253187,
+        "cpp-opt": 1276426,
+        "c": 1269705,
+        "cpp": 1258557,
+        "as": 1049071,
+        "manual": 1139865
+      }
+    },
+    {
+      "index": 8,
+      "order": [
+        "cpp",
+        "manual",
+        "cpp-opt",
+        "rust",
+        "c",
+        "as"
+      ],
+      "medians": {
+        "cpp": 1280878,
+        "manual": 1145916,
+        "cpp-opt": 1279183,
+        "rust": 1239639,
+        "c": 1273432,
+        "as": 1068254
+      }
+    },
+    {
+      "index": 9,
+      "order": [
+        "c",
+        "manual",
+        "cpp",
+        "rust",
+        "cpp-opt",
+        "as"
+      ],
+      "medians": {
+        "c": 1273878,
+        "manual": 1146210,
+        "cpp": 1266826,
+        "rust": 1264364,
+        "cpp-opt": 1246637,
+        "as": 1059190
+      }
+    },
+    {
+      "index": 10,
+      "order": [
+        "as",
+        "rust",
+        "manual",
+        "c",
+        "cpp-opt",
+        "cpp"
+      ],
+      "medians": {
+        "as": 1059901,
+        "rust": 1268869,
+        "manual": 1155338,
+        "c": 1261797,
+        "cpp-opt": 1293873,
+        "cpp": 1260383
+      }
+    },
+    {
+      "index": 11,
+      "order": [
+        "as",
+        "cpp-opt",
+        "manual",
+        "c",
+        "cpp",
+        "rust"
+      ],
+      "medians": {
+        "as": 1063908,
+        "cpp-opt": 1282310,
+        "manual": 1127670,
+        "c": 1269662,
+        "cpp": 1278662,
+        "rust": 1263215
+      }
+    }
+  ],
+  "engines": [
+    {
+      "id": "manual",
+      "name": "Ручной байткод",
+      "blocks": [
+        1156879,
+        1140156,
+        1144150,
+        1147158,
+        1159151,
+        1111664,
+        1155931,
+        1139865,
+        1145916,
+        1146210,
+        1155338,
+        1127670
+      ],
+      "median": 1146063,
+      "min": 1111664,
+      "max": 1159151,
+      "ratio": {
+        "median": 0.8965537543362374,
+        "lo": 0.8889591075558554,
+        "hi": 0.9034717161760943,
+        "wins": 0,
+        "total": 12
+      }
+    },
+    {
+      "id": "rust",
+      "name": "Rust",
+      "blocks": [
+        1219942,
+        1255619,
+        1258943,
+        1255641,
+        1254209,
+        1267449,
+        1261592,
+        1253187,
+        1239639,
+        1264364,
+        1268869,
+        1263215
+      ],
+      "median": 1257292,
+      "min": 1219942,
+      "max": 1268869,
+      "ratio": {
+        "median": 0.983451300429028,
+        "lo": 0.9776427983030098,
+        "hi": 0.988345402483795,
+        "wins": 2,
+        "total": 12
+      }
+    },
+    {
+      "id": "as",
+      "name": "AssemblyScript",
+      "blocks": [
+        1050749,
+        1060547,
+        1054166,
+        1052147,
+        1045973,
+        1053267,
+        1052356,
+        1049071,
+        1068254,
+        1059190,
+        1059901,
+        1063908
+      ],
+      "median": 1053716.5,
+      "min": 1045973,
+      "max": 1068254,
+      "ratio": {
+        "median": 0.8255765042505555,
+        "lo": 0.8205254177516803,
+        "hi": 0.8323936403571031,
+        "wins": 0,
+        "total": 12
+      }
+    },
+    {
+      "id": "c",
+      "name": "C",
+      "blocks": [
+        1277605,
+        1268168,
+        1266889,
+        1267468,
+        1278144,
+        1264124,
+        1275671,
+        1269705,
+        1273432,
+        1273878,
+        1261797,
+        1269662
+      ],
+      "median": 1269683.5,
+      "min": 1261797,
+      "max": 1278144,
+      "ratio": {
+        "median": 0.9954398103876202,
+        "lo": 0.9905309469715686,
+        "hi": 0.9992646729064003,
+        "wins": 3,
+        "total": 12
+      }
+    },
+    {
+      "id": "cpp",
+      "name": "C++ -Oz",
+      "blocks": [
+        1224971,
+        1258970,
+        1272891,
+        1255593,
+        1254145,
+        1265760,
+        1260997,
+        1258557,
+        1280878,
+        1266826,
+        1260383,
+        1278662
+      ],
+      "median": 1260690,
+      "min": 1224971,
+      "max": 1280878,
+      "ratio": {
+        "median": 0.9872293754252759,
+        "lo": 0.9792697696040304,
+        "hi": 1.000708101976624,
+        "wins": 4,
+        "total": 12
+      }
+    },
+    {
+      "id": "cpp-opt",
+      "name": "C++ -O3",
+      "blocks": [
+        1289305,
+        1288329,
+        1272775,
+        1271460,
+        1278008,
+        1258145,
+        1277686,
+        1276426,
+        1279183,
+        1246637,
+        1293873,
+        1282310
+      ],
+      "median": 1277847,
+      "min": 1246637,
+      "max": 1293873,
+      "ratio": {
+        "median": 1,
+        "lo": 1,
+        "hi": 1,
+        "wins": 0,
+        "total": 12
+      }
+    }
+  ]
+}

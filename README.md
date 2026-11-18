@@ -4,7 +4,8 @@
 
 Research artifact: can a language model write WebAssembly bytecode directly, without a
 high-level language and a compiler? Four projects are measured, each with the same fixed API
-implemented six ways — five languages, with C++ built twice.
+implemented six ways — five languages, with C++ built twice. The article (`index.html`) is in
+Russian with an English abstract, keywords, references and a statements section; version v0.2.
 
 ## Calculator
 
@@ -20,10 +21,12 @@ repeat `=`.
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 1 872 B | 911 B | 822 B | 17/17 | 1 225 |
 | C++ -O3 | clang++ -O3, no exceptions/RTTI | 2 437 B | 987 B | 900 B | 17/17 | 1 225 |
 
-Speed lives in `data/calculator.json`: all six builds land within ~1.2× of each other. In
-paired randomized blocks the optimized hand-written module is about 2 % faster than the
-previous hand-written version and about 3 % slower than C++ `-O3`; the other pairs are
-within noise. C++ `-O3` vs `-Oz` is about +7 % ops/sec for +30 % module bytes.
+Speed lives in `data/calculator.json`: all six builds land within ~1.15× of each other. In
+paired randomized blocks (20 blocks, seed `20261119`) the hand-written module is 2.7 % slower
+than C++ `-O3` (95 % CI −3.5…−2.3, 1/20 wins); AssemblyScript is 4.6 % behind, C++ `-Oz`
+6.7 %, C 9.4 % and Rust 13.3 % — every interval excludes zero. C++ `-O3` vs `-Oz` is about
++7 % ops/sec for +30 % module bytes. The paired data do not confirm a speed gain over the
+previous hand-written version, which was measured in an earlier session.
 
 The hand-written module is the smallest after gzip/brotli (610/574 B), but not in raw
 bytes: AssemblyScript is 1 164 B vs 1 418 B. It is authored as WAT and assembled with
@@ -49,8 +52,9 @@ The picture reverses: AssemblyScript is the smallest both raw and compressed, an
 hand-written module is second after gzip/brotli (+0.5 % / +0.7 %) — no longer the winner.
 Its WAT costs 2.3–2.9× the tokens of the compiled sources. All six builds parse 13 valid and
 14 invalid documents with identical error codes and positions. Speed in `data/json.json` is
-2.63–2.93 M documents/s (1.11× spread); C++ `-O3` is fastest, the hand-written module is
-slowest, and differences below 2–3 % were not resolved with paired blocks.
+2.63–2.93 M documents/s (1.11× spread); C++ `-O3` is fastest. Paired blocks (12) put every
+build behind it: C −6.6 %, C++ `-Oz` −7.7 %, AssemblyScript −9.0 %, Rust −9.3 %, the
+hand-written module −9.9 %, with 0/12 wins. C++ `-O3` vs `-Oz` is +8.3 % speed for +22 % bytes.
 
 ## Regex engine
 
@@ -74,9 +78,10 @@ AssemblyScript wins raw and compressed; the hand-written module is second (+10.1
 +6.6 % gzip, +3.0 % brotli). Its WAT costs 2.3–2.6× the tokens of the compiled sources.
 All six pass 39 matching pairs, 18 invalid patterns with exact error positions, and four
 contract checks (match before compile, both buffer limits, step cap on `(a+)+b`).
-Speed in `data/regex.json` is 1.07–1.31 M searches/s (1.22× spread): C++ `-O3`, C and C++ `-Oz`
-are within 2 %, Rust is ~6 % behind, the hand-written module is ~14 % behind and
-AssemblyScript ~18 %. C++ `-O3` buys under 2 % speed for +52 % bytes.
+Speed in `data/regex.json` is 1.07–1.31 M searches/s (1.22× spread). Paired blocks (12) put
+C 0.5 % behind C++ `-O3`, C++ `-Oz` 1.3 % (its interval includes zero), Rust 1.7 %, the
+hand-written module 10.3 % and AssemblyScript 17.4 %; wins are 3/12, 4/12, 2/12, 0/12 and
+0/12 respectively. C++ `-O3` buys +1.4 % speed for +52 % bytes.
 
 ## Stack VM
 
@@ -106,8 +111,10 @@ programs with exact error codes and `pc`. A differential fuzzer compared 60 000 
 programs against a reference model in JavaScript and found one real divergence — operand pop
 order on `DIV`/`MOD` faults in the hand-written build — fixed before the published run.
 Speed in `data/vm.json` is 14.9k–38.7k runs/s (2.60× spread), but the spread is entirely
-AssemblyScript: the other five builds land within 1.21×, and the hand-written module is
-statistically tied with C and C++ (38.7k vs 38.4k/38.3k).
+AssemblyScript: the other five builds land within 1.03×. Paired blocks (12) show the
+hand-written module 2.3 % ahead of C++ `-O3` (11/12 wins), with C++ `-Oz` +1.5 % (12/12) and
+C +1.3 % (11/12) also ahead; Rust is 15.2 % behind and AssemblyScript 60.7 %. C++ `-O3` vs
+`-Oz` is −1.5 % speed for +1.1 % bytes.
 
 The article lives at the repository root: [`index.html`](index.html).
 Live version: <https://knyazevs.github.io/tokens-to-bytes/>.
@@ -132,6 +139,11 @@ Live version: <https://knyazevs.github.io/tokens-to-bytes/>.
   processes — 60 samples per build. The headline is the median; min, mean, max and standard
   deviation are published alongside it to show the noise. In the browser each build gets its
   own Worker.
+- **Paired blocks** — for contrasts smaller than the between-session drift, each block runs
+  every build once in a randomized order, one fresh process per build. The ratio to C++ `-O3`
+  is computed inside the block; the median ratio gets a 95 % bootstrap interval over blocks
+  (10 000 resamples). Calculator: 20 blocks; JSON, regex and VM: 12 each; seed `20261119`.
+  Results live in `data/paired-<slug>.json` and feed the paired table in the article.
 
 ## Why one process per build
 
@@ -176,6 +188,10 @@ npm run build:manual        # rebuild the hand-written calculator wasm (needs wa
 npm run build:json          # rebuild all six JSON builds (needs Rust, asc, clang, wasm-opt)
 npm run build:regex         # rebuild all six regex builds
 npm run build:vm            # rebuild all six VM builds
+node builds/paired.mjs calculator 20   # data/paired-calculator.json
+node builds/paired.mjs json 12         # data/paired-json.json
+node builds/paired.mjs regex 12        # data/paired-regex.json
+node builds/paired.mjs vm 12           # data/paired-vm.json
 ```
 
 On a hybrid CPU, pin the measurement to P-cores so Windows does not schedule it onto
@@ -200,6 +216,10 @@ data/
   tokens-json.json         JSON parser artifact token counts
   tokens-regex.json        regex engine artifact token counts
   tokens-vm.json           stack VM artifact token counts
+  paired-calculator.json   calculator paired randomized blocks
+  paired-json.json         JSON paired randomized blocks
+  paired-regex.json        regex paired randomized blocks
+  paired-vm.json           VM paired randomized blocks
 projects/calculator/       demo, six wasm modules, bench page, WAT
 projects/json/             demo, six wasm modules, bench page, WAT
 projects/regex/            demo, six wasm modules, bench page, WAT
