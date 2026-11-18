@@ -118,25 +118,36 @@ function runWorkload(w) {
 }
 
 // ops/sec: вызовы API (включая clear) в секунду. Медиана из `rounds` замеров.
-export function benchmark(w, { rounds = 5, durationMs = 120, warmupMs = 60 } = {}) {
-  const warmStart = performance.now();
-  while (performance.now() - warmStart < warmupMs) runWorkload(w);
-
+// Протокол статьи: прогрев 500 мс, затем 7 окон по 150 мс.
+// Меряется одна сборка на процесс (Node) или на Worker (браузер) — см. builds/bench-one.mjs
+// и assets/bench-client.js: несколько горячих модулей в одном контексте искажают результат.
+export function benchmark(w, { rounds = 7, durationMs = 150, warmupMs = 500 } = {}) {
+  warmUp(w, warmupMs);
   const samples = [];
-  for (let r = 0; r < rounds; r++) {
-    let ops = 0;
-    const start = performance.now();
-    let elapsed = 0;
-    while (elapsed < durationMs) {
-      runWorkload(w);
-      ops += WORKLOAD_OPS;
-      elapsed = performance.now() - start;
-    }
-    samples.push(ops / (elapsed / 1000));
+  for (let r = 0; r < rounds; r++) samples.push(measureRound(w, durationMs));
+  return { opsPerSec: medianSample(samples), samples };
+}
+
+function warmUp(w, warmupMs) {
+  const start = performance.now();
+  while (performance.now() - start < warmupMs) runWorkload(w);
+}
+
+function measureRound(w, durationMs) {
+  let ops = 0;
+  const start = performance.now();
+  let elapsed = 0;
+  while (elapsed < durationMs) {
+    runWorkload(w);
+    ops += WORKLOAD_OPS;
+    elapsed = performance.now() - start;
   }
-  samples.sort((a, b) => a - b);
-  const mid = samples[Math.floor(samples.length / 2)];
-  return { opsPerSec: mid, samples };
+  return ops / (elapsed / 1000);
+}
+
+function medianSample(samples) {
+  const sorted = [...samples].sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
 }
 
 export function median(values) {

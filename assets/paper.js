@@ -1,4 +1,5 @@
-import { benchmark, missingExports, runTests } from './protocol.js';
+import { missingExports, runTests } from './protocol.js';
+import { benchIsolated } from './bench-client.js';
 
 const REPO = 'https://github.com/knyazevs/tokens-to-bytes';
 const $ = (sel) => document.querySelector(sel);
@@ -72,23 +73,29 @@ function renderMeta(data) {
     if (stat) stat.textContent = `${lo.toFixed(1).replace('.', ',')}–${hi.toFixed(1).replace('.', ',')}`;
   }
 
-  const ratio = (v) => v.toFixed(1).replace('.', ',');
-  const manualPerf = manual?.perf?.opsPerSec;
-  if (manualPerf) {
-    const peers = engines.filter((e) => e.id !== 'manual' && e.id !== 'cpp');
-    if (peers.length) {
-      const ratios = peers.map((e) => manualPerf / e.perf.opsPerSec);
-      const stat = $('[data-stat="perf-range"]');
-      if (stat) {
-        const lo = ratio(Math.min(...ratios));
-        const hi = ratio(Math.max(...ratios));
-        stat.textContent = lo === hi ? lo : `${lo}–${hi}`;
-      }
+  const perfValues = engines.map((e) => e.perf.opsPerSec);
+  const perfBest = Math.max(...perfValues);
+  const perfWorst = Math.min(...perfValues);
+
+  const spread = $('[data-stat="perf-spread"]');
+  if (spread) spread.textContent = (perfBest / perfWorst).toFixed(2).replace('.', ',');
+
+  const opsMin = $('[data-stat="ops-min"]');
+  if (opsMin) opsMin.textContent = (perfWorst / 1e6).toFixed(1).replace('.', ',');
+
+  const opsMax = $('[data-stat="ops-max"]');
+  if (opsMax) opsMax.textContent = (perfBest / 1e6).toFixed(1).replace('.', ',');
+
+  const cpp = engines.find((e) => e.id === 'cpp');
+  const cppOpt = engines.find((e) => e.id === 'cpp-opt');
+  if (cpp && cppOpt) {
+    const gain = $('[data-stat="cpp-gain"]');
+    if (gain) {
+      gain.textContent = Math.round((cppOpt.perf.opsPerSec / cpp.perf.opsPerSec - 1) * 100);
     }
-    const cpp = engines.find((e) => e.id === 'cpp');
-    if (cpp) {
-      const stat = $('[data-stat="perf-cpp"]');
-      if (stat) stat.textContent = ratio(manualPerf / cpp.perf.opsPerSec);
+    const size = $('[data-stat="cpp-size"]');
+    if (size) {
+      size.textContent = Math.round((cppOpt.bytes / cpp.bytes - 1) * 100);
     }
   }
 
@@ -100,8 +107,11 @@ function renderMeta(data) {
   $('#updated').textContent = updated;
   $('#foot-updated').textContent = updated;
 
+  const affinity = data.environment?.affinity;
   $('#results-env').textContent =
-    `Node ${data.environment?.node ?? '—'} · ${data.environment?.platform ?? '—'} · ${cpu} · токенизатор ${data.environment?.tokenizer ?? '—'}`;
+    `Node ${data.environment?.node ?? '—'} · ${data.environment?.platform ?? '—'} · ${cpu}` +
+    (affinity ? ` · привязка к ядрам 0x${affinity}` : '') +
+    ` · токенизатор ${data.environment?.tokenizer ?? '—'}`;
 }
 
 function sourceUrl(path) {
@@ -266,32 +276,34 @@ $('#bench-btn').addEventListener('click', async (ev) => {
   if (!DATA) return;
   btn.disabled = true;
   const status = $('#bench-status');
-  const rows = [];
   status.classList.add('run');
 
-  for (const engine of DATA.engines) {
-    status.textContent = `измеряю ${engine.name}…`;
-    try {
-      const exports = await instantiate(await loadEngineBytes(engine));
-      const perf = benchmark(exports);
-      rows.push({ engine, ...perf });
-    } catch (err) {
-      rows.push({ engine, error: err.message });
-    }
-  }
+  const engines = DATA.engines.map((engine) => ({
+    ...engine,
+    url: `projects/calculator/${engine.file}`,
+  }));
 
-  const best = Math.max(...rows.filter((r) => !r.error).map((r) => r.opsPerSec));
+  const rows = await benchIsolated(engines, {
+    onProgress: ({ index, total, engine }) => {
+      status.textContent = `измеряю ${engine.name} (${index + 1}/${total})…`;
+    },
+  });
+
+  const ok = rows.filter((r) => r.ok && r.perf);
+  const best = ok.length ? Math.max(...ok.map((r) => r.perf.opsPerSec)) : 0;
+
   $('#bench-table tbody').innerHTML = rows.map((r) => {
-    if (r.error) {
+    if (!r.ok) {
       return `<tr><td><span class="dot-key" style="background:${r.engine.tone}"></span>${r.engine.name}</td><td colspan="4" class="quiet">${r.error}</td></tr>`;
     }
-    const msPerMillion = (1e6 / r.opsPerSec) * 1000;
-    const rel = best / r.opsPerSec;
-    const rounds = r.samples.map((v) => Math.round(v / 1e6)).join(' · ');
+    const opsPerSec = r.perf.opsPerSec;
+    const msPerMillion = (1e6 / opsPerSec) * 1000;
+    const rel = best / opsPerSec;
+    const rounds = r.perf.samples.map((v) => Math.round(v / 1e6)).join(' · ');
     return `
       <tr>
         <td><span class="dot-key" style="background:${r.engine.tone}"></span><b>${r.engine.name}</b></td>
-        <td class="strong">${fmtInt(Math.round(r.opsPerSec))}</td>
+        <td class="strong">${fmtInt(Math.round(opsPerSec))}</td>
         <td>${msPerMillion.toFixed(1)}</td>
         <td>${rel === 1 ? 'лучший' : '×' + rel.toFixed(2)}</td>
         <td class="quiet">${rounds} M/s</td>
@@ -300,7 +312,7 @@ $('#bench-btn').addEventListener('click', async (ev) => {
   }).join('');
 
   status.classList.remove('run');
-  status.textContent = `готово · ${new Date().toLocaleTimeString('ru-RU')} · браузер`;
+  status.textContent = `готово · ${new Date().toLocaleTimeString('ru-RU')} · браузер, отдельный Worker на сборку`;
   btn.disabled = false;
 });
 

@@ -179,7 +179,7 @@
 
     <p class="kicker">projects / calculator / bench</p>
     <h1>Бенчмарк калькулятора</h1>
-    <p class="lead">Пять модулей, одинаковый API и одинаковая нагрузка. Проверка корректности и скорость выполнения — в одном запуске, прямо в браузере.</p>
+    <p class="lead">Шесть сборок, одинаковый API и одинаковая нагрузка. Проверка корректности и скорость выполнения — в одном запуске, прямо в браузере. Каждая сборка измеряется в своём Worker.</p>
 
     <div class="controls">
       <button class="btn primary" id="run-btn" type="button">Проверить и измерить</button>
@@ -199,7 +199,8 @@
     </div>
 
     <ul class="notes">
-      <li>Нагрузка: 12 последовательностей, 76 вызовов API за проход; прогрев, 5 раундов по 120 мс, медиана.</li>
+      <li>Нагрузка: 12 последовательностей, 76 вызовов API за проход. Каждая сборка измеряется в отдельном Worker: прогрев 500 мс, 7 раундов по 150 мс, медиана.</li>
+      <li>Изоляция нужна, чтобы V8 не делил бюджет оптимизации между несколькими горячими wasm-модулями: иначе последняя измеренная сборка проседает в 2–3 раза.</li>
       <li>gzip считается в браузере через <code>CompressionStream</code>; размер — байты самого модуля.</li>
       <li>Методика и Node-числа — в <a href="../../index.html#method">статье</a> и <a href="../../index.html#results">таблице результатов</a>.</li>
       <li>Для загрузки внешних wasm нужен HTTP-сервер: <code>python -m http.server</code> в корне репозитория.</li>
@@ -207,14 +208,15 @@
   </main>
 
   <script type="module">
-    import { benchmark, missingExports, runTests } from '../../assets/protocol.js';
+    import { benchIsolated } from '../../assets/bench-client.js';
 
     const ENGINES = [
       { id: 'manual', name: 'Ручной байткод', file: 'calc.wasm', tone: '#3b82f6' },
       { id: 'rust', name: 'Rust', file: 'calc-rust.wasm', tone: '#f59e0b' },
       { id: 'as', name: 'AssemblyScript', file: 'calc-assemblyscript.wasm', tone: '#10b981' },
       { id: 'c', name: 'C', file: 'calc-c.wasm', tone: '#8b5cf6' },
-      { id: 'cpp', name: 'C++', file: 'calc-cpp.wasm', tone: '#ec4899' },
+      { id: 'cpp', name: 'C++ -Oz', file: 'calc-cpp.wasm', tone: '#ec4899' },
+      { id: 'cpp-opt', name: 'C++ -O3', file: 'calc-cpp-opt.wasm', tone: '#e11d48' },
     ];
 
     const $ = (sel) => document.querySelector(sel);
@@ -263,17 +265,6 @@
       return cache.get(engine.id);
     }
 
-    async function instantiate(bytes) {
-      if (!WebAssembly.validate(bytes)) throw new Error('invalid wasm');
-      const mod = new WebAssembly.Module(bytes);
-      const imports = {};
-      for (const imp of WebAssembly.Module.imports(mod)) {
-        (imports[imp.module] ||= {})[imp.name] = () => {};
-      }
-      const instance = await WebAssembly.instantiate(mod, imports);
-      return instance.exports;
-    }
-
     async function gzipSize(bytes) {
       if (!('CompressionStream' in window)) return null;
       const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
@@ -285,44 +276,47 @@
       btn.disabled = true;
       statusEl.classList.add('run');
       const started = performance.now();
-      const results = [];
 
       for (const engine of ENGINES) {
         statusEl.textContent = `загружаю ${engine.name}…`;
         try {
           const bytes = await bytesFor(engine);
-          const gzip = await gzipSize(bytes);
-          const exports = await instantiate(bytes);
-          const missing = missingExports(exports);
-          if (missing.length) throw new Error(`нет: ${missing.join(', ')}`);
-
           set(engine.id, 'bytes', `${bytes.length} Б`);
+          const gzip = await gzipSize(bytes);
           set(engine.id, 'gzip', gzip == null ? '—' : `${gzip} Б`);
-
-          const tests = runTests(exports);
-          set(engine.id, 'tests', `<span class="pill ${tests.passed === tests.total ? 'ok' : 'bad'}">${tests.passed}/${tests.total}</span>`);
-          if (tests.passed !== tests.total) throw new Error(tests.failures.join('; '));
-
-          statusEl.textContent = `измеряю ${engine.name}…`;
-          const perf = benchmark(exports);
-          results.push({ engine, opsPerSec: perf.opsPerSec, samples: perf.samples });
         } catch (err) {
-          set(engine.id, 'tests', '<span class="pill bad">FAIL</span>');
-          set(engine.id, 'ops', `<span class="quiet">${err.message}</span>`);
+          set(engine.id, 'bytes', `<span class="quiet">${err.message}</span>`);
         }
       }
 
-      const best = Math.max(...results.map((r) => r.opsPerSec));
-      for (const r of results) {
-        set(r.engine.id, 'ops', Math.round(r.opsPerSec).toLocaleString('ru-RU'));
-        set(r.engine.id, 'ms', ((1e6 / r.opsPerSec) * 1000).toFixed(1));
-        const rel = best / r.opsPerSec;
+      const rows = await benchIsolated(
+        ENGINES.map((engine) => ({ ...engine, url: engine.file })),
+        {
+          onProgress: ({ index, total, engine }) => {
+            statusEl.textContent = `измеряю ${engine.name} (${index + 1}/${total})…`;
+          },
+        },
+      );
+
+      const ok = rows.filter((r) => r.ok && r.perf);
+      const best = ok.length ? Math.max(...ok.map((r) => r.perf.opsPerSec)) : 0;
+
+      for (const r of rows) {
+        if (!r.ok) {
+          set(r.engine.id, 'tests', '<span class="pill bad">FAIL</span>');
+          set(r.engine.id, 'ops', `<span class="quiet">${r.error}</span>`);
+          continue;
+        }
+        set(r.engine.id, 'tests', `<span class="pill ${r.tests.passed === r.tests.total ? 'ok' : 'bad'}">${r.tests.passed}/${r.tests.total}</span>`);
+        set(r.engine.id, 'ops', Math.round(r.perf.opsPerSec).toLocaleString('ru-RU'));
+        set(r.engine.id, 'ms', ((1e6 / r.perf.opsPerSec) * 1000).toFixed(1));
+        const rel = best / r.perf.opsPerSec;
         set(r.engine.id, 'rel', rel === 1 ? '<b>лучший</b>' : `×${rel.toFixed(2)}`);
       }
 
       statusEl.classList.remove('run');
       const seconds = ((performance.now() - started) / 1000).toFixed(1);
-      statusEl.textContent = `готово за ${seconds} с · ${results.length}/${ENGINES.length} сборок · браузер`;
+      statusEl.textContent = `готово за ${seconds} с · ${ok.length}/${ENGINES.length} сборок · браузер`;
       btn.disabled = false;
     });
   </script>

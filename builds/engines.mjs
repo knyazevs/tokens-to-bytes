@@ -50,7 +50,7 @@ export const ENGINES = [
   },
   {
     id: 'cpp',
-    name: 'C++',
+    name: 'C++ -Oz',
     short: 'cpp',
     file: 'calc-cpp.wasm',
     method: 'clang++ --target=wasm32-freestanding',
@@ -58,6 +58,17 @@ export const ENGINES = [
     source: 'builds/cpp/calc.cpp',
     authoring: 'builds/cpp/calc.cpp',
     tone: '#ec4899',
+  },
+  {
+    id: 'cpp-opt',
+    name: 'C++ -O3',
+    short: 'cpp-opt',
+    file: 'calc-cpp-opt.wasm',
+    method: 'clang++ --target=wasm32-freestanding, -O3',
+    toolchain: 'clang++ 24, -O3 -fno-exceptions -fno-rtti',
+    source: 'builds/cpp/calc.cpp',
+    authoring: 'builds/cpp/calc.cpp',
+    tone: '#e11d48',
   },
 ];
 

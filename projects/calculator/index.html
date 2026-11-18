@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark light">
   <title>Калькулятор · tokens→bytes</title>
-  <meta name="description" content="Один калькулятор, пять wasm-реализаций: ручной байткод, Rust, AssemblyScript, C и C++.">
+  <meta name="description" content="Один калькулятор, шесть wasm-сборок: ручной байткод, Rust, AssemblyScript, C, C++ -Oz и C++ -O3.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2315171c'/%3E%3Ctext x='16' y='22' font-family='monospace' font-size='15' fill='%23f59e0b' text-anchor='middle'%3E%E2%86%92%3C/text%3E%3C/svg%3E">
   <style>
     :root {
@@ -566,7 +566,7 @@
     <header class="top">
       <div class="brand">
         <span class="badge">WASM</span>
-        <span class="tagline">один API · пять реализаций</span>
+        <span class="tagline">один API · шесть сборок</span>
       </div>
       <div class="actions">
         <a class="icon-btn" href="bench.html" aria-label="Бенчмарк проекта" title="Бенчмарк проекта">▤</a>
@@ -628,7 +628,7 @@
         <h3>Реализации</h3>
         <ul>
           <li><code>calc.wasm</code> — ручной байткод (<code>calc.wat</code> — его текстовая форма);</li>
-          <li><code>calc-rust.wasm</code>, <code>calc-assemblyscript.wasm</code>, <code>calc-c.wasm</code>, <code>calc-cpp.wasm</code> — сборки из Rust / AssemblyScript / C / C++.</li>
+          <li><code>calc-rust.wasm</code>, <code>calc-assemblyscript.wasm</code>, <code>calc-c.wasm</code>, <code>calc-cpp.wasm</code> — сборки из Rust / AssemblyScript / C / C++; <code>calc-cpp-opt.wasm</code> — тот же C++ с <code>-O3</code> вместо <code>-Oz</code>.</li>
         </ul>
 
         <h3>Запуск</h3>
@@ -660,7 +660,8 @@
       { id: 'rust', name: 'Rust', file: 'calc-rust.wasm', tone: '#f59e0b' },
       { id: 'as', name: 'AssemblyScript', file: 'calc-assemblyscript.wasm', tone: '#34d399' },
       { id: 'c', name: 'C', file: 'calc-c.wasm', tone: '#a78bfa' },
-      { id: 'cpp', name: 'C++', file: 'calc-cpp.wasm', tone: '#f472b6' },
+      { id: 'cpp', name: 'C++ -Oz', file: 'calc-cpp.wasm', tone: '#f472b6' },
+      { id: 'cpp-opt', name: 'C++ -O3', file: 'calc-cpp-opt.wasm', tone: '#fb7185' },
     ];
 
     const requested = new URLSearchParams(location.search).get('engine');

@@ -8,6 +8,8 @@
   "scripts": {
     "tokens": "node builds/tokens.mjs",
     "measure": "node builds/measure.mjs",
+    "bench:one": "node builds/bench-one.mjs",
+    "build:cpp": "node builds/build-cpp.mjs",
     "all": "npm run tokens && npm run measure"
   },
   "devDependencies": {
