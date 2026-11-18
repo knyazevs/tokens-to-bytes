@@ -711,6 +711,9 @@
     }
 
     async function selectEngine(engine) {
+      // Пока новый модуль грузится, ввод не должен уходить в старый:
+      // иначе нажатия применятся к движку, который вот-вот заменят.
+      w = null;
       renderEngines(engine.id);
       statusEl.textContent = `загрузка ${engine.file}…`;
       try {
