@@ -10,7 +10,7 @@ export const ENGINES = [
     short: 'manual',
     file: 'calc.wasm',
     method: 'байткод без компилятора',
-    toolchain: 'WAT → wasm вручную',
+    toolchain: 'WAT → wasm через wasm-as',
     source: 'projects/calculator/calc.wat',
     authoring: 'projects/calculator/calc.wat',
     tone: '#3b82f6',

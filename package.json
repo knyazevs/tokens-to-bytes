@@ -10,6 +10,7 @@
     "measure": "node builds/measure.mjs",
     "bench:one": "node builds/bench-one.mjs",
     "build:cpp": "node builds/build-cpp.mjs",
+    "build:manual": "node builds/build-manual.mjs",
     "all": "npm run tokens && npm run measure"
   },
   "devDependencies": {

@@ -66,6 +66,14 @@ function renderMeta(data) {
   const statMin = $('[data-stat="min-bytes"]');
   if (statMin) statMin.textContent = fmtInt(min.bytes);
 
+  const minGzip = engines.reduce((a, b) => (a.gzip <= b.gzip ? a : b));
+  const statGzip = $('[data-stat="min-gzip"]');
+  if (statGzip) statGzip.textContent = fmtInt(minGzip.gzip);
+
+  const minBrotli = engines.reduce((a, b) => (a.brotli <= b.brotli ? a : b));
+  const statBrotli = $('[data-stat="min-brotli"]');
+  if (statBrotli) statBrotli.textContent = fmtInt(minBrotli.brotli);
+
   if (manual?.tokens && compiled.length) {
     const ratios = compiled.map((e) => manual.tokens.artifact / e.tokens.artifact);
     const lo = Math.min(...ratios);
