@@ -12,7 +12,7 @@ export const BENCH_PROTOCOL = { warmupMs: 500, rounds: 7, durationMs: 150 };
  *          onProgress?: (info: {index: number, total: number, engine: object}) => void}} [opts]
  * @returns {Promise<Array<{engine: object, ok: boolean, error?: string,
  *          bytes?: number, tests?: {passed: number, total: number},
- *          perf?: {opsPerSec: number, samples: number[], workloadOps: number}}>>}
+ *          perf?: {opsPerSec: number, samples: number[], stats: object, workloadOps: number}}>>}
  */
 export async function benchIsolated(engines, opts = {}) {
   const { onProgress, ...rest } = opts;

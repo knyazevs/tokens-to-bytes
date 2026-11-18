@@ -31,8 +31,10 @@ Live version: <https://knyazevs.github.io/tokens-to-bytes/>.
   identically in Node and in the browser.
 - **Size** — raw wasm bytes, gzip -9, brotli q11.
 - **Performance** — API calls per second on a deterministic workload (76 calls per pass).
-  Every build is measured in its own Node process: 500 ms warmup, 7 rounds × 150 ms, five
-  processes, median across all samples. In the browser each build gets its own Worker.
+  Every build is measured in its own Node process: 750 ms warmup, 10 rounds × 150 ms, six
+  processes — 60 samples per build. The headline is the median; min, mean, max and standard
+  deviation are published alongside it to show the noise. In the browser each build gets its
+  own Worker.
 
 ## Why one process per build
 

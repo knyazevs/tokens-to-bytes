@@ -191,7 +191,7 @@
         <thead>
           <tr>
             <th>Реализация</th><th>.wasm</th><th>gzip</th><th>Тесты</th>
-            <th>ops/sec</th><th>мс / 1M</th><th>к лучшему</th>
+            <th>медиана</th><th>мин</th><th>макс</th><th>к лучшему</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
@@ -199,7 +199,7 @@
     </div>
 
     <ul class="notes">
-      <li>Нагрузка: 12 последовательностей, 76 вызовов API за проход. Каждая сборка измеряется в отдельном Worker: прогрев 500 мс, 7 раундов по 150 мс, медиана.</li>
+      <li>Нагрузка: 12 последовательностей, 76 вызовов API за проход. Каждая сборка измеряется в отдельном Worker: прогрев 500 мс, 7 раундов по 150 мс; в таблице — медиана и коридор min–max. Числа — вызовы API в секунду.</li>
       <li>Изоляция нужна, чтобы V8 не делил бюджет оптимизации между несколькими горячими wasm-модулями: иначе последняя измеренная сборка проседает в 2–3 раза.</li>
       <li>gzip считается в браузере через <code>CompressionStream</code>; размер — байты самого модуля.</li>
       <li>Методика и Node-числа — в <a href="../../index.html#method">статье</a> и <a href="../../index.html#results">таблице результатов</a>.</li>
@@ -243,7 +243,8 @@
           <td class="gzip quiet">—</td>
           <td class="tests quiet">—</td>
           <td class="ops quiet">—</td>
-          <td class="ms quiet">—</td>
+          <td class="min quiet">—</td>
+          <td class="max quiet">—</td>
           <td class="rel quiet">—</td>
         </tr>
       `;
@@ -309,7 +310,8 @@
         }
         set(r.engine.id, 'tests', `<span class="pill ${r.tests.passed === r.tests.total ? 'ok' : 'bad'}">${r.tests.passed}/${r.tests.total}</span>`);
         set(r.engine.id, 'ops', Math.round(r.perf.opsPerSec).toLocaleString('ru-RU'));
-        set(r.engine.id, 'ms', ((1e6 / r.perf.opsPerSec) * 1000).toFixed(1));
+        set(r.engine.id, 'min', Math.round(r.perf.stats?.min ?? r.perf.opsPerSec).toLocaleString('ru-RU'));
+        set(r.engine.id, 'max', Math.round(r.perf.stats?.max ?? r.perf.opsPerSec).toLocaleString('ru-RU'));
         const rel = best / r.perf.opsPerSec;
         set(r.engine.id, 'rel', rel === 1 ? '<b>лучший</b>' : `×${rel.toFixed(2)}`);
       }

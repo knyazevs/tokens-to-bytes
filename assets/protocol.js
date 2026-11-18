@@ -118,14 +118,31 @@ function runWorkload(w) {
 }
 
 // ops/sec: вызовы API (включая clear) в секунду. Медиана из `rounds` замеров.
-// Протокол статьи: прогрев 500 мс, затем 7 окон по 150 мс.
+// Протокол статьи (Node): прогрев 750 мс, затем 10 окон по 150 мс, шесть процессов.
 // Меряется одна сборка на процесс (Node) или на Worker (браузер) — см. builds/bench-one.mjs
 // и assets/bench-client.js: несколько горячих модулей в одном контексте искажают результат.
-export function benchmark(w, { rounds = 7, durationMs = 150, warmupMs = 500 } = {}) {
+export function benchmark(w, { rounds = 10, durationMs = 150, warmupMs = 750 } = {}) {
   warmUp(w, warmupMs);
   const samples = [];
   for (let r = 0; r < rounds; r++) samples.push(measureRound(w, durationMs));
   return { opsPerSec: medianSample(samples), samples };
+}
+
+// Разброс по всем замерам: минимум, среднее, медиана, максимум, стандартное отклонение.
+// Медиана — заголовочное число: она устойчива к одиночным выбросам, в отличие от среднего.
+export function describeStats(values) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const n = sorted.length;
+  const mean = values.reduce((sum, v) => sum + v, 0) / n;
+  const variance = values.reduce((sum, v) => sum + (v - mean) ** 2, 0) / n;
+  return {
+    min: sorted[0],
+    max: sorted[n - 1],
+    mean,
+    median: sorted[Math.floor(n / 2)],
+    stddev: Math.sqrt(variance),
+  };
 }
 
 function warmUp(w, warmupMs) {
@@ -147,10 +164,5 @@ function measureRound(w, durationMs) {
 
 function medianSample(samples) {
   const sorted = [...samples].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-}
-
-export function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)];
 }

@@ -1,5 +1,5 @@
 import { missingExports, runTests } from './protocol.js';
-import { benchIsolated } from './bench-client.js';
+import { benchIsolated, BENCH_PROTOCOL } from './bench-client.js';
 
 const REPO = 'https://github.com/knyazevs/tokens-to-bytes';
 const $ = (sel) => document.querySelector(sel);
@@ -42,9 +42,10 @@ async function loadJson(path) {
 }
 
 function fail(message) {
-  for (const sel of ['#setup-table tbody', '#results-table tbody']) {
+  const tables = { '#setup-table tbody': 4, '#results-table tbody': 7, '#spread-table tbody': 6 };
+  for (const [sel, cols] of Object.entries(tables)) {
     const body = $(sel);
-    if (body) body.innerHTML = `<tr><td colspan="7" class="quiet">${message}</td></tr>`;
+    if (body) body.innerHTML = `<tr><td colspan="${cols}" class="quiet">${message}</td></tr>`;
   }
   $('#size-chart').innerHTML = `<p class="quiet" style="margin:0">${message}</p>`;
   $('#verify-status').textContent = message;
@@ -85,6 +86,19 @@ function renderMeta(data) {
 
   const opsMax = $('[data-stat="ops-max"]');
   if (opsMax) opsMax.textContent = (perfBest / 1e6).toFixed(1).replace('.', ',');
+
+  const spreads = engines
+    .filter((e) => e.perf.stats?.median)
+    .map((e) => (e.perf.stats.stddev / e.perf.stats.median) * 100);
+  if (spreads.length) {
+    const noiseMin = $('[data-stat="noise-min"]');
+    if (noiseMin) noiseMin.textContent = Math.min(...spreads).toFixed(1).replace('.', ',');
+    const noiseMax = $('[data-stat="noise-max"]');
+    if (noiseMax) noiseMax.textContent = Math.max(...spreads).toFixed(1).replace('.', ',');
+  }
+
+  const samples = $('[data-stat="samples"]');
+  if (samples) samples.textContent = fmtInt(engines[0]?.perf.samples?.length ?? 0);
 
   const cpp = engines.find((e) => e.id === 'cpp');
   const cppOpt = engines.find((e) => e.id === 'cpp-opt');
@@ -161,6 +175,31 @@ function renderResults(data) {
       <td>${e.tokens ? fmtInt(e.tokens.artifact) : '—'}</td>
     </tr>
   `).join('');
+}
+
+const fmtOps = (v) => `${(v / 1e6).toFixed(1).replace('.', ',')}M`;
+
+function renderSpread(data) {
+  const body = $('#spread-table tbody');
+  if (!body) return;
+  const rows = data.engines.filter((e) => e.perf.stats);
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="6" class="quiet">Разброс не записан в данных.</td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((e) => {
+    const s = e.perf.stats;
+    return `
+      <tr>
+        <td><span class="dot-key" style="background:${e.tone}"></span><b>${e.name}</b></td>
+        <td>${fmtOps(s.min)}</td>
+        <td>${fmtOps(s.mean)}</td>
+        <td class="strong">${fmtOps(s.median)}</td>
+        <td>${fmtOps(s.max)}</td>
+        <td class="quiet">${fmtOps(s.stddev)}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function renderScatter(data) {
@@ -296,23 +335,21 @@ $('#bench-btn').addEventListener('click', async (ev) => {
     if (!r.ok) {
       return `<tr><td><span class="dot-key" style="background:${r.engine.tone}"></span>${r.engine.name}</td><td colspan="4" class="quiet">${r.error}</td></tr>`;
     }
-    const opsPerSec = r.perf.opsPerSec;
-    const msPerMillion = (1e6 / opsPerSec) * 1000;
+    const { opsPerSec, stats } = r.perf;
     const rel = best / opsPerSec;
-    const rounds = r.perf.samples.map((v) => Math.round(v / 1e6)).join(' · ');
     return `
       <tr>
         <td><span class="dot-key" style="background:${r.engine.tone}"></span><b>${r.engine.name}</b></td>
         <td class="strong">${fmtInt(Math.round(opsPerSec))}</td>
-        <td>${msPerMillion.toFixed(1)}</td>
+        <td class="quiet">${fmtInt(Math.round(stats?.min ?? opsPerSec))}</td>
+        <td class="quiet">${fmtInt(Math.round(stats?.max ?? opsPerSec))}</td>
         <td>${rel === 1 ? 'лучший' : '×' + rel.toFixed(2)}</td>
-        <td class="quiet">${rounds} M/s</td>
       </tr>
     `;
   }).join('');
 
   status.classList.remove('run');
-  status.textContent = `готово · ${new Date().toLocaleTimeString('ru-RU')} · браузер, отдельный Worker на сборку`;
+  status.textContent = `готово · ${new Date().toLocaleTimeString('ru-RU')} · ${BENCH_PROTOCOL.rounds} раундов на сборку, отдельный Worker`;
   btn.disabled = false;
 });
 
@@ -416,6 +453,7 @@ try {
   renderMeta(calculator);
   renderSetup(calculator);
   renderResults(calculator);
+  renderSpread(calculator);
   renderChart(calculator, metric);
   renderScatter(calculator);
   renderDemo(calculator);

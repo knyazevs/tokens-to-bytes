@@ -6,7 +6,7 @@
 //
 // Клиент: assets/bench-client.js.
 
-import { benchmark, missingExports, runTests, WORKLOAD_OPS } from './protocol.js';
+import { benchmark, describeStats, missingExports, runTests, WORKLOAD_OPS } from './protocol.js';
 
 self.onmessage = async (ev) => {
   const { url, warmupMs, rounds, durationMs } = ev.data;
@@ -30,6 +30,7 @@ self.onmessage = async (ev) => {
     if (tests.passed !== tests.total) throw new Error(tests.failures.join('; '));
 
     const perf = benchmark(exports, { warmupMs, rounds, durationMs });
+    const stats = describeStats(perf.samples);
 
     self.postMessage({
       ok: true,
@@ -38,6 +39,7 @@ self.onmessage = async (ev) => {
       perf: {
         opsPerSec: perf.opsPerSec,
         samples: perf.samples,
+        stats,
         workloadOps: WORKLOAD_OPS,
       },
     });
