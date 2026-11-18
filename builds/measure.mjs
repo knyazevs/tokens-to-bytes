@@ -110,10 +110,13 @@ for (const engine of project.engines) {
       : null,
   });
 
+  const scale = Math.max(stats.median, stats.min, stats.max) >= 1e6
+    ? (v) => `${(v / 1e6).toFixed(1)}M`
+    : (v) => `${(v / 1e3).toFixed(0)}k`;
   console.log(
-    `${engine.id.padEnd(8)} ${(engines.at(-1).perf.opsPerSec / 1e6).toFixed(1)}M ` +
-      `[${(stats.min / 1e6).toFixed(1)}–${(stats.max / 1e6).toFixed(1)}M] ` +
-      `(runs: ${runs.map((v) => (v / 1e6).toFixed(1)).join(' / ')})`,
+    `${engine.id.padEnd(8)} ${scale(engines.at(-1).perf.opsPerSec)} ` +
+      `[${scale(stats.min)}–${scale(stats.max)}] ` +
+      `(runs: ${runs.map(scale).join(' / ')})`,
   );
 }
 
@@ -143,10 +146,12 @@ console.log('\n| Реализация | .wasm | gzip | brotli | тесты | м�
 console.log('|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|');
 for (const e of engines) {
   const s = e.perf.stats;
-  const m = (v) => (v / 1e6).toFixed(1);
+  const scale = Math.max(s.median, s.min, s.max) >= 1e6 ? 1e6 : 1e3;
+  const unit = scale === 1e6 ? 'M' : 'k';
+  const m = (v) => (v / scale).toFixed(1);
   console.log(
     `| ${e.name} | ${e.bytes} Б | ${e.gzip} Б | ${e.brotli} Б | ${e.tests.passed}/${e.tests.total} | ` +
-      `${m(s.min)}M | ${m(s.mean)}M | **${m(s.median)}M** | ${m(s.max)}M | ${(s.stddev / 1e6).toFixed(1)}M | ` +
+      `${m(s.min)}${unit} | ${m(s.mean)}${unit} | **${m(s.median)}${unit}** | ${m(s.max)}${unit} | ${(s.stddev / scale).toFixed(1)}${unit} | ` +
       `${e.tokens ? e.tokens.artifact : '—'} |`,
   );
 }

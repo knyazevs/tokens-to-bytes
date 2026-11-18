@@ -3,6 +3,14 @@ import {
   missingExports as missingJsonExports,
   runTests as runJsonTests,
 } from './protocol-json.js';
+import {
+  missingExports as missingRegexExports,
+  runTests as runRegexTests,
+} from './protocol-regex.js';
+import {
+  missingExports as missingVmExports,
+  runTests as runVmTests,
+} from './protocol-vm.js';
 import { benchIsolated, BENCH_PROTOCOL } from './bench-client.js';
 
 const REPO = 'https://github.com/knyazevs/tokens-to-bytes';
@@ -51,16 +59,22 @@ function fail(message) {
     '#json-setup-table tbody': 4,
     '#json-results-table tbody': 7,
     '#json-spread-table tbody': 6,
+    '#regex-setup-table tbody': 4,
+    '#regex-results-table tbody': 7,
+    '#regex-spread-table tbody': 6,
+    '#vm-setup-table tbody': 4,
+    '#vm-results-table tbody': 7,
+    '#vm-spread-table tbody': 6,
   };
   for (const [sel, cols] of Object.entries(tables)) {
     const body = $(sel);
     if (body) body.innerHTML = `<tr><td colspan="${cols}" class="quiet">${message}</td></tr>`;
   }
-  for (const sel of ['#size-chart', '#json-size-chart']) {
+  for (const sel of ['#size-chart', '#json-size-chart', '#regex-size-chart', '#vm-size-chart']) {
     const el = $(sel);
     if (el) el.innerHTML = `<p class="quiet" style="margin:0">${message}</p>`;
   }
-  for (const sel of ['#verify-status', '#json-verify-status', '#bench-status', '#json-bench-status']) {
+  for (const sel of ['#verify-status', '#json-verify-status', '#regex-verify-status', '#vm-verify-status', '#bench-status', '#json-bench-status', '#regex-bench-status', '#vm-bench-status']) {
     const el = $(sel);
     if (el) el.textContent = 'данные недоступны';
   }
@@ -121,8 +135,8 @@ function renderMeta(data, prefix = '', { global = false } = {}) {
   }
 
   set('perf-spread', fmtDec(s.perfBest / s.perfWorst, 2));
-  set('ops-min', fmtDec(s.perfWorst / 1e6));
-  set('ops-max', fmtDec(s.perfBest / 1e6));
+  set('ops-min', fmtOps(s.perfWorst));
+  set('ops-max', fmtOps(s.perfBest));
 
   if (s.spreads.length) {
     set('noise-min', fmtDec(Math.min(...s.spreads)));
@@ -208,7 +222,11 @@ function renderChart(selector, data, metric) {
   }).join('');
 }
 
-const fmtOps = (v) => `${(v / 1e6).toFixed(1).replace('.', ',')}M`;
+const fmtOps = (v) => {
+  const scale = v >= 1e6 ? 1e6 : 1e3;
+  const unit = scale === 1e6 ? 'M' : 'k';
+  return `${(v / scale).toFixed(1).replace('.', ',')}${unit}`;
+};
 
 function renderSpread(selector, data) {
   const body = $(selector);
@@ -502,14 +520,18 @@ $('#copy-bib').addEventListener('click', async (ev) => {
 
 initToc();
 
-const [calculatorResult, jsonResult, projectsResult] = await Promise.allSettled([
+const [calculatorResult, jsonResult, regexResult, vmResult, projectsResult] = await Promise.allSettled([
   loadJson('data/calculator.json'),
   loadJson('data/json.json'),
+  loadJson('data/regex.json'),
+  loadJson('data/vm.json'),
   loadJson('data/projects.json'),
 ]);
 
 const calculator = calculatorResult.status === 'fulfilled' ? calculatorResult.value : null;
 const json = jsonResult.status === 'fulfilled' ? jsonResult.value : null;
+const regex = regexResult.status === 'fulfilled' ? regexResult.value : null;
+const vm = vmResult.status === 'fulfilled' ? vmResult.value : null;
 const projects = projectsResult.status === 'fulfilled' ? projectsResult.value : null;
 
 if (calculator) {
@@ -584,6 +606,84 @@ if (json) {
 } else {
   const status = $('#json-verify-status');
   if (status) status.textContent = 'data/json.json недоступен — нужен локальный сервер';
+}
+
+if (regex) {
+  renderMeta(regex, 'regex');
+  const updated = $('#regex-updated');
+  if (updated) updated.textContent = dateRu(regex.generatedAt);
+  renderSetup('#regex-setup-table tbody', regex);
+  renderResults('#regex-results-table tbody', regex, 'regex-engine-tests');
+  renderSpread('#regex-spread-table tbody', regex);
+  renderChart('#regex-size-chart', regex, 'bytes');
+  renderScatter('#regex-scatter', regex);
+  initMetric('#regex-metric', '#regex-size-chart', regex);
+  initVerify({
+    data: regex,
+    dir: 'projects/regex',
+    button: '#regex-verify-btn',
+    status: '#regex-verify-status',
+    testAttr: 'regex-engine-tests',
+    missing: missingRegexExports,
+    tests: runRegexTests,
+  });
+  initDemo({
+    data: regex,
+    dir: 'projects/regex',
+    tabs: '#regex-engine-tabs',
+    frame: '#regex-demo-frame',
+    url: '#regex-demo-url',
+  });
+  initBench({
+    data: regex,
+    dir: 'projects/regex',
+    button: '#regex-bench-btn',
+    status: '#regex-bench-status',
+    table: '#regex-bench-table',
+    protocolUrl: 'assets/protocol-regex.js',
+  });
+} else {
+  const status = $('#regex-verify-status');
+  if (status) status.textContent = 'data/regex.json недоступен — нужен локальный сервер';
+}
+
+if (vm) {
+  renderMeta(vm, 'vm');
+  const updated = $('#vm-updated');
+  if (updated) updated.textContent = dateRu(vm.generatedAt);
+  renderSetup('#vm-setup-table tbody', vm);
+  renderResults('#vm-results-table tbody', vm, 'vm-engine-tests');
+  renderSpread('#vm-spread-table tbody', vm);
+  renderChart('#vm-size-chart', vm, 'bytes');
+  renderScatter('#vm-scatter', vm);
+  initMetric('#vm-metric', '#vm-size-chart', vm);
+  initVerify({
+    data: vm,
+    dir: 'projects/vm',
+    button: '#vm-verify-btn',
+    status: '#vm-verify-status',
+    testAttr: 'vm-engine-tests',
+    missing: missingVmExports,
+    tests: runVmTests,
+  });
+  initDemo({
+    data: vm,
+    dir: 'projects/vm',
+    tabs: '#vm-engine-tabs',
+    frame: '#vm-demo-frame',
+    url: '#vm-demo-url',
+  });
+  initBench({
+    data: vm,
+    dir: 'projects/vm',
+    button: '#vm-bench-btn',
+    status: '#vm-bench-status',
+    table: '#vm-bench-table',
+    protocolUrl: 'assets/protocol-vm.js',
+  });
+} else {
+  const status = $('#vm-verify-status');
+  if (status) status.textContent = 'data/vm.json недоступен — нужен локальный сервер';
 }
 
 if (projects) {

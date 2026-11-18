@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-11-18",
+  "updated": "2026-11-19",
   "projects": [
     {
       "slug": "calculator",
@@ -27,24 +27,24 @@
     {
       "slug": "regex",
       "name": "Regex-движок",
-      "status": "planned",
-      "summary": "Бэктрекинг по небольшому подмножеству PCRE. Здесь важны не только байты, но и защита от катастрофического бэктрекинга — отдельная метрика корректности.",
-      "tags": ["backtracking", "bounded input", "worst case"],
-      "demo": null,
-      "bench": null,
-      "source": null,
-      "results": null
+      "status": "live",
+      "summary": "Компиляция подмножества PCRE в байткод и бэктрекинг-VM с лимитом шагов. Здесь важны не только байты и токены, но и защита от катастрофического бэктрекинга — отдельная метрика корректности.",
+      "tags": ["backtracking", "61 тест", "step cap", "6 сборок"],
+      "demo": "projects/regex/index.html",
+      "bench": "projects/regex/bench.html",
+      "source": "projects/regex",
+      "results": "data/regex.json"
     },
     {
       "slug": "vm",
       "name": "Стековая VM",
-      "status": "planned",
-      "summary": "Интерпретатор байткода с циклом, ветвлениями и стеком. Проверяет предел прямого синтеза: когда ручной wasm перестаёт помещаться в контекст и начинается декомпозиция.",
-      "tags": ["interpreter", "bytecode", "control flow"],
-      "demo": null,
-      "bench": null,
-      "source": null,
-      "results": null
+      "status": "live",
+      "summary": "Интерпретатор собственного байткода: 27 команд, общий стек значений и кадры вызовов на 128 уровней. Проверяет предел прямого синтеза: загрузка, исполнение, ошибки с точным pc и лимит шагов.",
+      "tags": ["interpreter", "bytecode", "52 теста", "6 сборок"],
+      "demo": "projects/vm/index.html",
+      "bench": "projects/vm/bench.html",
+      "source": "projects/vm",
+      "results": "data/vm.json"
     }
   ]
 }

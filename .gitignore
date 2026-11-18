@@ -2,6 +2,8 @@
 node_modules/
 builds/rust/target/
 builds/rust-json/target/
+builds/rust-regex/target/
+builds/rust-vm/target/
 *.log
 .DS_Store
 Thumbs.db

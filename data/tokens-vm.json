@@ -1,0 +1,49 @@
+{
+  "tokenizer": "o200k_base",
+  "generatedAt": "2026-11-18T22:48:08.105Z",
+  "note": "artifactTokens — токены естественной формы артефакта (lower bound на стоимость генерации); binaryBase64Tokens — токены base64-представления wasm.",
+  "engines": {
+    "manual": {
+      "authoringFile": "projects/vm/vm.wat",
+      "authoringBytes": 34969,
+      "artifactTokens": 7948,
+      "binaryBase64Tokens": 1979,
+      "binaryBytes": 2513
+    },
+    "rust": {
+      "authoringFile": "builds/rust-vm/src/lib.rs",
+      "authoringBytes": 11482,
+      "artifactTokens": 2820,
+      "binaryBase64Tokens": 1812,
+      "binaryBytes": 2255
+    },
+    "as": {
+      "authoringFile": "builds/assemblyscript/assembly/vm.ts",
+      "authoringBytes": 8015,
+      "artifactTokens": 2713,
+      "binaryBase64Tokens": 1351,
+      "binaryBytes": 1693
+    },
+    "c": {
+      "authoringFile": "builds/c/vm.c",
+      "authoringBytes": 6615,
+      "artifactTokens": 2228,
+      "binaryBase64Tokens": 1541,
+      "binaryBytes": 1897
+    },
+    "cpp": {
+      "authoringFile": "builds/cpp/vm.cpp",
+      "authoringBytes": 6646,
+      "artifactTokens": 2239,
+      "binaryBase64Tokens": 1541,
+      "binaryBytes": 1897
+    },
+    "cpp-opt": {
+      "authoringFile": "builds/cpp/vm.cpp",
+      "authoringBytes": 6646,
+      "artifactTokens": 2239,
+      "binaryBase64Tokens": 1547,
+      "binaryBytes": 1917
+    }
+  }
+}

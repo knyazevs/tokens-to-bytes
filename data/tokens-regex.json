@@ -1,0 +1,49 @@
+{
+  "tokenizer": "o200k_base",
+  "generatedAt": "2026-11-18T22:38:24.815Z",
+  "note": "artifactTokens — токены естественной формы артефакта (lower bound на стоимость генерации); binaryBase64Tokens — токены base64-представления wasm.",
+  "engines": {
+    "manual": {
+      "authoringFile": "projects/regex/re.wat",
+      "authoringBytes": 33268,
+      "artifactTokens": 10727,
+      "binaryBase64Tokens": 2731,
+      "binaryBytes": 3449
+    },
+    "rust": {
+      "authoringFile": "builds/rust-regex/src/lib.rs",
+      "authoringBytes": 16683,
+      "artifactTokens": 4679,
+      "binaryBase64Tokens": 3238,
+      "binaryBytes": 4005
+    },
+    "as": {
+      "authoringFile": "builds/assemblyscript/assembly/regex.ts",
+      "authoringBytes": 12954,
+      "artifactTokens": 4650,
+      "binaryBase64Tokens": 2462,
+      "binaryBytes": 3132
+    },
+    "c": {
+      "authoringFile": "builds/c/regex.c",
+      "authoringBytes": 12469,
+      "artifactTokens": 4182,
+      "binaryBase64Tokens": 3038,
+      "binaryBytes": 3761
+    },
+    "cpp": {
+      "authoringFile": "builds/cpp/regex.cpp",
+      "authoringBytes": 12486,
+      "artifactTokens": 4188,
+      "binaryBase64Tokens": 3038,
+      "binaryBytes": 3761
+    },
+    "cpp-opt": {
+      "authoringFile": "builds/cpp/regex.cpp",
+      "authoringBytes": 12486,
+      "artifactTokens": 4188,
+      "binaryBase64Tokens": 4551,
+      "binaryBytes": 5703
+    }
+  }
+}
