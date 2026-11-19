@@ -21,7 +21,7 @@
   (global $string_bytes (mut i32) (i32.const 0))
 
   (func $byte_at (param $i i32) (result i32)
-    (i32.load8_u (i32.add (local.get $i) (i32.const 0x10000))))
+    (i32.load8_u offset=65536 (local.get $i)))
 
   (func $fail (param $code i32) (param $at i32) (result i32)
     (global.set $err_code (local.get $code))
@@ -30,17 +30,23 @@
 
   (func $skip_ws
     (local $c i32)
+    (local $p i32)
+    (local $len i32)
+    (local.set $p (global.get $pos))
+    (local.set $len (global.get $len))
     (block $done
       (loop $again
-        (br_if $done (i32.ge_s (global.get $pos) (global.get $len)))
-        (local.set $c (call $byte_at (global.get $pos)))
+        (br_if $done (i32.ge_s (local.get $p) (local.get $len)))
+        (local.set $c (i32.load8_u offset=65536 (local.get $p)))
+        (br_if $done (i32.gt_u (local.get $c) (i32.const 32)))
         (br_if $done
           (i32.eqz
             (i32.or
               (i32.or (i32.eq (local.get $c) (i32.const 32)) (i32.eq (local.get $c) (i32.const 9)))
               (i32.or (i32.eq (local.get $c) (i32.const 10)) (i32.eq (local.get $c) (i32.const 13))))))
-        (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
-        (br $again))))
+        (local.set $p (i32.add (local.get $p) (i32.const 1)))
+        (br $again)))
+    (global.set $pos (local.get $p)))
 
   (func $pow10i (param $e i32) (result f64)
     (local $r f64)
@@ -60,9 +66,7 @@
       (then
         (if (i32.ge_s (local.get $outlen) (i32.const 4096))
           (then (return (i32.const 0))))
-        (i32.store8
-          (i32.add (i32.const 0x20000) (local.get $outlen))
-          (local.get $b))))
+        (i32.store8 offset=131072 (local.get $outlen) (local.get $b))))
     (i32.const 1))
 
   (func $emit_cp (param $keep i32) (param $outlen i32) (param $cp i32) (result i32)
@@ -120,7 +124,7 @@
           (then
             (drop (call $fail (i32.const 6) (local.get $at)))
             (return (i32.const -1))))
-        (local.set $c (call $byte_at (global.get $pos)))
+        (local.set $c (i32.load8_u offset=65536 (global.get $pos)))
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
         (if (i32.and (i32.ge_s (local.get $c) (i32.const 48)) (i32.le_s (local.get $c) (i32.const 57)))
           (then (local.set $d (i32.sub (local.get $c) (i32.const 48))))
@@ -160,7 +164,7 @@
       (loop $again
         (if (i32.ge_s (global.get $pos) (global.get $len))
           (then (return (call $fail (i32.const 2) (global.get $len)))))
-        (local.set $c (call $byte_at (global.get $pos)))
+        (local.set $c (i32.load8_u offset=65536 (global.get $pos)))
         (if (i32.eq (local.get $c) (i32.const 34))
           (then
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
@@ -172,8 +176,11 @@
           (then (return (call $fail (i32.const 6) (global.get $pos)))))
         (if (i32.ne (local.get $c) (i32.const 92))
           (then
-            (if (i32.eqz (call $store_byte (local.get $keep) (local.get $outlen) (local.get $c)))
-              (then (return (call $fail (i32.const 8) (local.get $start)))))
+            (if (local.get $keep)
+              (then
+                (if (i32.ge_s (local.get $outlen) (i32.const 4096))
+                  (then (return (call $fail (i32.const 8) (local.get $start)))))
+                (i32.store8 offset=131072 (local.get $outlen) (local.get $c))))
             (local.set $outlen (i32.add (local.get $outlen) (i32.const 1)))
             (global.set $pos (i32.add (global.get $pos) (i32.const 1))))
           (else
@@ -181,7 +188,7 @@
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
             (if (i32.ge_s (global.get $pos) (global.get $len))
               (then (return (call $fail (i32.const 2) (global.get $len)))))
-            (local.set $e (call $byte_at (global.get $pos)))
+            (local.set $e (i32.load8_u offset=65536 (global.get $pos)))
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
             (local.set $cp (i32.const 0))
             (local.set $known (i32.const 0))
@@ -212,8 +219,8 @@
                              (i32.le_s (local.get $hi) (i32.const 0xDBFF)))
                   (then
                     (if (i32.or (i32.or (i32.ge_s (i32.add (global.get $pos) (i32.const 1)) (global.get $len))
-                                        (i32.ne (call $byte_at (global.get $pos)) (i32.const 92)))
-                                (i32.ne (call $byte_at (i32.add (global.get $pos) (i32.const 1))) (i32.const 117)))
+                                        (i32.ne (i32.load8_u offset=65536 (global.get $pos)) (i32.const 92)))
+                                (i32.ne (i32.load8_u offset=65536 (i32.add (global.get $pos) (i32.const 1))) (i32.const 117)))
                       (then (local.set $bad (i32.const 1)))
                       (else
                         (global.set $pos (i32.add (global.get $pos) (i32.const 2)))
@@ -252,7 +259,7 @@
     (local $eneg i32)
     (local $exp i32)
     (local $p f64)
-    (if (i32.eq (call $byte_at (global.get $pos)) (i32.const 45))
+    (if (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 45))
       (then
         (local.set $neg (i32.const 1))
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
@@ -262,13 +269,13 @@
       (then (return (call $fail (i32.const 2) (global.get $len)))))
 
     (local.set $value (f64.const 0))
-    (local.set $c (call $byte_at (global.get $pos)))
+    (local.set $c (i32.load8_u offset=65536 (global.get $pos)))
     (if (i32.eq (local.get $c) (i32.const 48))
       (then
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
         (if (i32.and (i32.lt_s (global.get $pos) (global.get $len))
-                     (i32.and (i32.ge_s (call $byte_at (global.get $pos)) (i32.const 48))
-                              (i32.le_s (call $byte_at (global.get $pos)) (i32.const 57))))
+                     (i32.and (i32.ge_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 48))
+                              (i32.le_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 57))))
           (then (return (call $fail (i32.const 5) (global.get $pos))))))
       (else
         (if (i32.and (i32.ge_s (local.get $c) (i32.const 49)) (i32.le_s (local.get $c) (i32.const 57)))
@@ -276,62 +283,62 @@
             (block $done
               (loop $again
                 (br_if $done (i32.ge_s (global.get $pos) (global.get $len)))
-                (br_if $done (i32.lt_s (call $byte_at (global.get $pos)) (i32.const 48)))
-                (br_if $done (i32.gt_s (call $byte_at (global.get $pos)) (i32.const 57)))
+                (local.set $c (i32.sub (i32.load8_u offset=65536 (global.get $pos)) (i32.const 48)))
+                (br_if $done (i32.gt_u (local.get $c) (i32.const 9)))
                 (local.set $value
                   (f64.add (f64.mul (local.get $value) (f64.const 10))
-                           (f64.convert_i32_s (i32.sub (call $byte_at (global.get $pos)) (i32.const 48)))))
+                           (f64.convert_i32_u (local.get $c))))
                 (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
                 (br $again))))
           (else (return (call $fail (i32.const 5) (global.get $pos)))))))
 
     (if (i32.and (i32.lt_s (global.get $pos) (global.get $len))
-                 (i32.eq (call $byte_at (global.get $pos)) (i32.const 46)))
+                 (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 46)))
       (then
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
         (if (i32.or (i32.ge_s (global.get $pos) (global.get $len))
-                    (i32.or (i32.lt_s (call $byte_at (global.get $pos)) (i32.const 48))
-                            (i32.gt_s (call $byte_at (global.get $pos)) (i32.const 57))))
+                    (i32.or (i32.lt_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 48))
+                            (i32.gt_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 57))))
           (then (return (call $fail (i32.const 5) (global.get $pos)))))
         (local.set $scale (f64.const 0.1))
         (block $done
           (loop $again
             (br_if $done (i32.ge_s (global.get $pos) (global.get $len)))
-            (br_if $done (i32.lt_s (call $byte_at (global.get $pos)) (i32.const 48)))
-            (br_if $done (i32.gt_s (call $byte_at (global.get $pos)) (i32.const 57)))
+            (local.set $c (i32.sub (i32.load8_u offset=65536 (global.get $pos)) (i32.const 48)))
+            (br_if $done (i32.gt_u (local.get $c) (i32.const 9)))
             (local.set $value
               (f64.add (local.get $value)
-                (f64.mul (f64.convert_i32_s (i32.sub (call $byte_at (global.get $pos)) (i32.const 48)))
+                (f64.mul (f64.convert_i32_u (local.get $c))
                          (local.get $scale))))
             (local.set $scale (f64.mul (local.get $scale) (f64.const 0.1)))
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
             (br $again)))))
 
     (if (i32.and (i32.lt_s (global.get $pos) (global.get $len))
-                 (i32.or (i32.eq (call $byte_at (global.get $pos)) (i32.const 101))
-                         (i32.eq (call $byte_at (global.get $pos)) (i32.const 69))))
+                 (i32.or (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 101))
+                         (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 69))))
       (then
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
         (if (i32.and (i32.lt_s (global.get $pos) (global.get $len))
-                     (i32.or (i32.eq (call $byte_at (global.get $pos)) (i32.const 43))
-                             (i32.eq (call $byte_at (global.get $pos)) (i32.const 45))))
+                     (i32.or (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 43))
+                             (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 45))))
           (then
-            (if (i32.eq (call $byte_at (global.get $pos)) (i32.const 45))
+            (if (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 45))
               (then (local.set $eneg (i32.const 1))))
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))))
         (if (i32.or (i32.ge_s (global.get $pos) (global.get $len))
-                    (i32.or (i32.lt_s (call $byte_at (global.get $pos)) (i32.const 48))
-                            (i32.gt_s (call $byte_at (global.get $pos)) (i32.const 57))))
+                    (i32.or (i32.lt_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 48))
+                            (i32.gt_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 57))))
           (then (return (call $fail (i32.const 5) (global.get $pos)))))
         (local.set $exp (i32.const 0))
         (block $done
           (loop $again
             (br_if $done (i32.ge_s (global.get $pos) (global.get $len)))
-            (br_if $done (i32.lt_s (call $byte_at (global.get $pos)) (i32.const 48)))
-            (br_if $done (i32.gt_s (call $byte_at (global.get $pos)) (i32.const 57)))
+            (br_if $done (i32.lt_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 48)))
+            (br_if $done (i32.gt_s (i32.load8_u offset=65536 (global.get $pos)) (i32.const 57)))
             (if (i32.lt_s (local.get $exp) (i32.const 10000))
               (then (local.set $exp (i32.add (i32.mul (local.get $exp) (i32.const 10))
-                                             (i32.sub (call $byte_at (global.get $pos)) (i32.const 48))))))
+                                             (i32.sub (i32.load8_u offset=65536 (global.get $pos)) (i32.const 48))))))
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
             (br $again)))
         (local.set $p (call $pow10i (local.get $exp)))
@@ -353,7 +360,7 @@
     (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
     (call $skip_ws)
     (if (i32.and (i32.lt_s (global.get $pos) (global.get $len))
-                 (i32.eq (call $byte_at (global.get $pos)) (i32.const 93)))
+                 (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 93)))
       (then
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
         (if (i32.eq (local.get $depth) (i32.const 1)) (then (global.set $root_len (i32.const 0))))
@@ -367,14 +374,14 @@
         (call $skip_ws)
         (if (i32.ge_s (global.get $pos) (global.get $len))
           (then (return (call $fail (i32.const 2) (global.get $len)))))
-        (local.set $c (call $byte_at (global.get $pos)))
+        (local.set $c (i32.load8_u offset=65536 (global.get $pos)))
         (if (i32.eq (local.get $c) (i32.const 44))
           (then
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
             (call $skip_ws)
             (if (i32.ge_s (global.get $pos) (global.get $len))
               (then (return (call $fail (i32.const 2) (global.get $len)))))
-            (if (i32.eq (call $byte_at (global.get $pos)) (i32.const 93))
+            (if (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 93))
               (then (return (call $fail (i32.const 1) (global.get $pos)))))
             (br $again)))
         (if (i32.eq (local.get $c) (i32.const 93))
@@ -391,7 +398,7 @@
     (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
     (call $skip_ws)
     (if (i32.and (i32.lt_s (global.get $pos) (global.get $len))
-                 (i32.eq (call $byte_at (global.get $pos)) (i32.const 125)))
+                 (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 125)))
       (then
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
         (if (i32.eq (local.get $depth) (i32.const 1)) (then (global.set $root_len (i32.const 0))))
@@ -402,14 +409,14 @@
         (call $skip_ws)
         (if (i32.ge_s (global.get $pos) (global.get $len))
           (then (return (call $fail (i32.const 2) (global.get $len)))))
-        (if (i32.ne (call $byte_at (global.get $pos)) (i32.const 34))
+        (if (i32.ne (i32.load8_u offset=65536 (global.get $pos)) (i32.const 34))
           (then (return (call $fail (i32.const 1) (global.get $pos)))))
         (if (i32.eqz (call $parse_string (i32.const 1) (local.get $depth)))
           (then (return (i32.const 0))))
         (call $skip_ws)
         (if (i32.ge_s (global.get $pos) (global.get $len))
           (then (return (call $fail (i32.const 2) (global.get $len)))))
-        (if (i32.ne (call $byte_at (global.get $pos)) (i32.const 58))
+        (if (i32.ne (i32.load8_u offset=65536 (global.get $pos)) (i32.const 58))
           (then (return (call $fail (i32.const 1) (global.get $pos)))))
         (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
         (local.set $count (i32.add (local.get $count) (i32.const 1)))
@@ -418,14 +425,14 @@
         (call $skip_ws)
         (if (i32.ge_s (global.get $pos) (global.get $len))
           (then (return (call $fail (i32.const 2) (global.get $len)))))
-        (local.set $c (call $byte_at (global.get $pos)))
+        (local.set $c (i32.load8_u offset=65536 (global.get $pos)))
         (if (i32.eq (local.get $c) (i32.const 44))
           (then
             (global.set $pos (i32.add (global.get $pos) (i32.const 1)))
             (call $skip_ws)
             (if (i32.ge_s (global.get $pos) (global.get $len))
               (then (return (call $fail (i32.const 2) (global.get $len)))))
-            (if (i32.eq (call $byte_at (global.get $pos)) (i32.const 125))
+            (if (i32.eq (i32.load8_u offset=65536 (global.get $pos)) (i32.const 125))
               (then (return (call $fail (i32.const 1) (global.get $pos)))))
             (br $again)))
         (if (i32.eq (local.get $c) (i32.const 125))
@@ -446,7 +453,7 @@
     (call $skip_ws)
     (if (i32.ge_s (global.get $pos) (global.get $len))
       (then (return (call $fail (i32.const 2) (global.get $len)))))
-    (local.set $c (call $byte_at (global.get $pos)))
+    (local.set $c (i32.load8_u offset=65536 (global.get $pos)))
     (local.set $start (global.get $pos))
     (global.set $nodes (i32.add (global.get $nodes) (i32.const 1)))
 
@@ -465,9 +472,7 @@
     (if (i32.eq (local.get $c) (i32.const 116))
       (then
         (if (i32.and (i32.le_s (i32.add (global.get $pos) (i32.const 4)) (global.get $len))
-                     (i32.and (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 1))) (i32.const 114))
-                              (i32.and (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 2))) (i32.const 117))
-                                       (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 3))) (i32.const 101)))))
+                     (i32.eq (i32.load offset=65536 (global.get $pos)) (i32.const 0x65757274)))
           (then
             (global.set $pos (i32.add (global.get $pos) (i32.const 4)))
             (if (i32.eq (local.get $depth) (i32.const 1)) (then (global.set $root_type (i32.const 2))))
@@ -476,10 +481,8 @@
     (if (i32.eq (local.get $c) (i32.const 102))
       (then
         (if (i32.and (i32.le_s (i32.add (global.get $pos) (i32.const 5)) (global.get $len))
-                     (i32.and (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 1))) (i32.const 97))
-                              (i32.and (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 2))) (i32.const 108))
-                                       (i32.and (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 3))) (i32.const 115))
-                                                (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 4))) (i32.const 101))))))
+                     (i32.and (i32.eq (i32.load offset=65536 (global.get $pos)) (i32.const 0x736c6166))
+                              (i32.eq (i32.load8_u offset=65540 (global.get $pos)) (i32.const 101))))
           (then
             (global.set $pos (i32.add (global.get $pos) (i32.const 5)))
             (if (i32.eq (local.get $depth) (i32.const 1)) (then (global.set $root_type (i32.const 1))))
@@ -488,9 +491,7 @@
     (if (i32.eq (local.get $c) (i32.const 110))
       (then
         (if (i32.and (i32.le_s (i32.add (global.get $pos) (i32.const 4)) (global.get $len))
-                     (i32.and (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 1))) (i32.const 117))
-                              (i32.and (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 2))) (i32.const 108))
-                                       (i32.eq (call $byte_at (i32.add (global.get $pos) (i32.const 3))) (i32.const 108)))))
+                     (i32.eq (i32.load offset=65536 (global.get $pos)) (i32.const 0x6c6c756e)))
           (then
             (global.set $pos (i32.add (global.get $pos) (i32.const 4)))
             (if (i32.eq (local.get $depth) (i32.const 1)) (then (global.set $root_type (i32.const 0))))

@@ -37,33 +37,36 @@
 
   (func $digit (export "digit") (param $n i32)
     (local $v f64)
-    (local $sign f64)
+    (local $c f64)
+    (local $s f64)
+    (local $term f64)
     (if (global.get $err) (then (call $clear)))
+    (local.set $v (f64.convert_i32_s (local.get $n)))
     (if (global.get $startNew)
       (then
-        (global.set $cur (f64.const 0))
+        (global.set $cur (local.get $v))
+        (global.set $last (local.get $v))
         (global.set $frac (i32.const 0))
         (global.set $scale (f64.const 1))
-        (global.set $startNew (i32.const 0))))
-    (local.set $v (f64.convert_i32_s (local.get $n)))
-    (local.set $sign
-      (select (f64.const -1) (f64.const 1)
-        (f64.lt (global.get $cur) (f64.const 0))))
+        (global.set $digits (i32.const 0))
+        (global.set $startNew (i32.const 0))
+        (return)))
+    (local.set $c (global.get $cur))
     (if (i32.eqz (global.get $frac))
       (then
         (global.set $cur
-          (f64.add
-            (f64.mul (global.get $cur) (f64.const 10))
-            (f64.mul (local.get $v) (local.get $sign)))))
+          (if (result f64) (f64.lt (local.get $c) (f64.const 0))
+            (then (f64.sub (f64.mul (local.get $c) (f64.const 10)) (local.get $v)))
+            (else (f64.add (f64.mul (local.get $c) (f64.const 10)) (local.get $v))))))
       (else
-        (global.set $scale (f64.mul (global.get $scale) (f64.const 0.1)))
+        (local.set $s (f64.mul (global.get $scale) (f64.const 0.1)))
+        (global.set $scale (local.get $s))
+        (local.set $term (f64.mul (local.get $v) (local.get $s)))
         (global.set $cur
-          (f64.add (global.get $cur)
-            (f64.mul
-              (f64.mul (local.get $v) (global.get $scale))
-              (local.get $sign))))
-        (global.set $digits
-          (i32.add (global.get $digits) (i32.const 1)))))
+          (if (result f64) (f64.lt (local.get $c) (f64.const 0))
+            (then (f64.sub (local.get $c) (local.get $term)))
+            (else (f64.add (local.get $c) (local.get $term)))))
+        (global.set $digits (i32.add (global.get $digits) (i32.const 1)))))
     (global.set $last (local.get $v)))
 
   (func $dot (export "dot")
@@ -160,11 +163,15 @@
           (then (global.set $last (f64.neg (global.get $last))))))))
 
   (func $op (export "op") (param $o i32)
+    (local $a f64)
+    (local $c f64)
     (if (global.get $err) (then (call $clear)))
     (if (global.get $op)
       (then
         (if (i32.eqz (global.get $startNew))
           (then
+            (local.set $a (global.get $acc))
+            (local.set $c (global.get $cur))
             (block $applyDone
               (block $case4
                 (block $case3
@@ -173,25 +180,22 @@
                       (block $default
                         (br_table $case1 $case2 $case3 $case4 $default
                           (i32.sub (global.get $op) (i32.const 1))))
-                      (global.set $acc (global.get $cur))
+                      (local.set $a (local.get $c))
                       (br $applyDone))
-                    (global.set $acc
-                      (f64.add (global.get $acc) (global.get $cur)))
+                    (local.set $a (f64.add (local.get $a) (local.get $c)))
                     (br $applyDone))
-                  (global.set $acc
-                    (f64.sub (global.get $acc) (global.get $cur)))
+                  (local.set $a (f64.sub (local.get $a) (local.get $c)))
                   (br $applyDone))
-                (global.set $acc
-                  (f64.mul (global.get $acc) (global.get $cur)))
+                (local.set $a (f64.mul (local.get $a) (local.get $c)))
                 (br $applyDone))
-              (if (f64.eq (global.get $cur) (f64.const 0))
+              (if (f64.eq (local.get $c) (f64.const 0))
                 (then
                   (global.set $err (i32.const 1))
-                  (global.set $acc (f64.const 0)))
+                  (local.set $a (f64.const 0)))
                 (else
-                  (global.set $acc
-                    (f64.div (global.get $acc) (global.get $cur))))))
-            (global.set $cur (global.get $acc)))))
+                  (local.set $a (f64.div (local.get $a) (local.get $c))))))
+            (global.set $acc (local.get $a))
+            (global.set $cur (local.get $a)))))
       (else
         (global.set $acc (global.get $cur))))
     (global.set $lastOp (local.get $o))
@@ -200,17 +204,17 @@
     (global.set $err (i32.const 0)))
 
   (func $equals (export "equals")
+    (local $a f64)
+    (local $c f64)
+    (local $op i32)
     (if (global.get $err) (then (return)))
-    (if (i32.eqz (global.get $op))
+    (local.set $op (global.get $op))
+    (if (local.get $op)
       (then
-        (if (i32.and (global.get $lastOp) (global.get $startNew))
-          (then
-            (global.set $op (global.get $lastOp))
-            (global.set $cur (global.get $operand))))))
-    (if (global.get $op)
-      (then
-        (global.set $left (global.get $acc))
-        (global.set $operand (global.get $cur))
+        (local.set $a (global.get $acc))
+        (local.set $c (global.get $cur))
+        (global.set $left (local.get $a))
+        (global.set $operand (local.get $c))
         (block $applyDone
           (block $case4
             (block $case3
@@ -218,30 +222,59 @@
                 (block $case1
                   (block $default
                     (br_table $case1 $case2 $case3 $case4 $default
-                      (i32.sub (global.get $op) (i32.const 1))))
-                  (global.set $acc (global.get $cur))
+                      (i32.sub (local.get $op) (i32.const 1))))
+                  (local.set $a (local.get $c))
                   (br $applyDone))
-                (global.set $acc
-                  (f64.add (global.get $acc) (global.get $cur)))
+                (local.set $a (f64.add (local.get $a) (local.get $c)))
                 (br $applyDone))
-              (global.set $acc
-                (f64.sub (global.get $acc) (global.get $cur)))
+              (local.set $a (f64.sub (local.get $a) (local.get $c)))
               (br $applyDone))
-            (global.set $acc
-              (f64.mul (global.get $acc) (global.get $cur)))
+            (local.set $a (f64.mul (local.get $a) (local.get $c)))
             (br $applyDone))
-          (if (f64.eq (global.get $cur) (f64.const 0))
+          (if (f64.eq (local.get $c) (f64.const 0))
             (then
               (global.set $err (i32.const 1))
-              (global.set $acc (f64.const 0)))
+              (local.set $a (f64.const 0)))
             (else
-              (global.set $acc
-                (f64.div (global.get $acc) (global.get $cur))))))
-        (global.set $cur (global.get $acc))
-        (global.set $lastOp (global.get $op))
+              (local.set $a (f64.div (local.get $a) (local.get $c))))))
+        (global.set $acc (local.get $a))
+        (global.set $cur (local.get $a))
+        (global.set $lastOp (local.get $op))
         (global.set $op (i32.const 0))
         (global.set $startNew (i32.const 1)))
       (else
+        (if (i32.and (global.get $lastOp) (global.get $startNew))
+          (then
+            (local.set $op (global.get $lastOp))
+            (local.set $c (global.get $operand))
+            (local.set $a (global.get $acc))
+            (global.set $left (local.get $a))
+            (global.set $cur (local.get $c))
+            (block $applyDone2
+              (block $case4_2
+                (block $case3_2
+                  (block $case2_2
+                    (block $case1_2
+                      (block $default_2
+                        (br_table $case1_2 $case2_2 $case3_2 $case4_2 $default_2
+                          (i32.sub (local.get $op) (i32.const 1))))
+                      (local.set $a (local.get $c))
+                      (br $applyDone2))
+                    (local.set $a (f64.add (local.get $a) (local.get $c)))
+                    (br $applyDone2))
+                  (local.set $a (f64.sub (local.get $a) (local.get $c)))
+                  (br $applyDone2))
+                (local.set $a (f64.mul (local.get $a) (local.get $c)))
+                (br $applyDone2))
+              (if (f64.eq (local.get $c) (f64.const 0))
+                (then
+                  (global.set $err (i32.const 1))
+                  (local.set $a (f64.const 0)))
+                (else
+                  (local.set $a (f64.div (local.get $a) (local.get $c))))))
+            (global.set $acc (local.get $a))
+            (global.set $cur (local.get $a))
+            (global.set $op (i32.const 0))))
         (global.set $startNew (i32.const 1)))))
 
   (func $display (export "display") (result f64)
