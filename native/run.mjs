@@ -19,6 +19,11 @@ const targets = {
     sources: ['native/types_harness.cpp', 'native/types_cpp.cpp', 'native/types_asm.s'],
     exe: 'native/bench_types.exe',
   },
+  vm: {
+    name: 'Duel 3: Stack VM Bytecode Interpreter (Direct Threading ASM vs C++ -O3)',
+    sources: ['native/vm_harness.cpp', 'native/vm_cpp.cpp', 'native/vm_asm.s'],
+    exe: 'native/bench_vm.exe',
+  },
 };
 
 const filter = process.argv[2];
