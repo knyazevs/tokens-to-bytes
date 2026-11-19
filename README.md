@@ -106,6 +106,21 @@ steps.
 beating Rust by +23.2 % and AssemblyScript by 2.66× (14 208 runs/s, 39.1 % of leader).
 Raw size dropped to 2 090 B (−16.8 %), and `manual-v2` set an absolute brotli compression record of **779 B**.
 
+## Adversarial Hardening of Reference C++
+
+To defend against the "straw man baseline" critique — the suspicion that high-level C++ reference code was written sub-optimally to make hand-written assembly appear artificially faster — all C++ references (`builds/cpp/*.cpp`) underwent an adversarial optimization audit:
+
+1. **Stack VM (`builds/cpp/vm.cpp`):** The 13 arithmetic opcodes previously shared a merged `switch` label containing a 13-branch linear `if-else` cascade. Un-nesting them into dedicated `case` labels with direct jump table dispatch yielded a **+14.6 % speedup in C++ -O3** (38 581 → 44 233 runs/s).
+2. **JSON Parser (`builds/cpp/json.cpp`):** Linear `if-else` value dispatch was converted to `switch (c)`, single-check ASCII whitespace filter `c > ' '` was added to `skipWs()`, and unsigned range checks were introduced in number and hex parsing. C++ -O3 throughput grew from 2.96M to **3.10M docs/s**.
+3. **Regex Engine (`builds/cpp/regex.cpp`):** Linear 8-branch interpreter chain was replaced with idiomatic `switch (op)`. C++ -O3 throughput rose to **1.32M searches/s**.
+4. **Calculator (`builds/cpp/calc.cpp`):** Floating-point division in fractional input was replaced with fast multiplication `scale *= 0.1`, yielding **145.1M ops/s**.
+
+Even against this hardened, optimized baseline:
+- **Regex:** Hand-written WAT (`manual-v2-opt`) beats C++ -O3 in **12 out of 12 paired blocks** (+6.2 %, 1.407M vs 1.323M searches/s).
+- **JSON:** Hand-written WAT (`manual-v2`) beats C++ -O3 in **10 out of 12 paired blocks** (+6.2 %, 3.300M vs 3.097M docs/s).
+- **Calculator:** Hand-written WAT (`manual-v2-opt`) is in **statistical parity** with C++ -O3 (148.2M vs 145.1M ops/s, 95 % CI: -2.9 % … +4.4 %, 5/12 wins) while being **4.3× smaller** (562 B vs 2 437 B).
+- **VM:** Hardened C++ -O3 takes the lead (44.2k vs 40.0k runs/s, -8.7 %) because Clang's loop optimizer pins the stack pointer `sp` in a physical CPU register across jump table dispatches, whereas WebAssembly WAT accesses a global variable and computes memory addresses per instruction.
+
 ## Cross-model replication
 
 The artifact-token counts above measure the artifact, not the generation process. A pilot

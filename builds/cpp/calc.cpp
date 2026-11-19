@@ -65,7 +65,7 @@ struct Calc {
     double d = static_cast<double>(value);
     double sign = cur < 0.0 ? -1.0 : 1.0;
     if (frac) {
-      scale /= 10.0;
+      scale *= 0.1;
       cur += d * scale * sign;
       ++digitsAfterDot;
     } else {

@@ -153,31 +153,74 @@ i32 vm_run(i32 limit) {
         values[sp - 2] = v;
         break;
 
-      case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
-      case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE:
-      case OP_AND: case OP_OR:
+      case OP_ADD:
         if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
         b = values[--sp];
-        a = values[--sp];
-        if (op == OP_ADD) v = a + b;
-        else if (op == OP_SUB) v = a - b;
-        else if (op == OP_MUL) v = a * b;
-        else if (op == OP_DIV) {
-          if (b == 0) { err = ERR_ZERO; goto fail; }
-          if (a == (i32)0x80000000 && b == -1) v = a;
-          else v = a / b;
-        } else if (op == OP_MOD) {
-          if (b == 0) { err = ERR_ZERO; goto fail; }
-          v = a % b;
-        } else if (op == OP_EQ) v = a == b;
-        else if (op == OP_NE) v = a != b;
-        else if (op == OP_LT) v = a < b;
-        else if (op == OP_LE) v = a <= b;
-        else if (op == OP_GT) v = a > b;
-        else if (op == OP_GE) v = a >= b;
-        else if (op == OP_AND) v = (a != 0) && (b != 0);
-        else v = (a != 0) || (b != 0);
-        values[sp++] = v;
+        values[sp - 1] += b;
+        break;
+      case OP_SUB:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] -= b;
+        break;
+      case OP_MUL:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] *= b;
+        break;
+      case OP_DIV:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        if (b == 0) { err = ERR_ZERO; goto fail; }
+        a = values[sp - 1];
+        if (a == (i32)0x80000000 && b == -1) values[sp - 1] = a;
+        else values[sp - 1] = a / b;
+        break;
+      case OP_MOD:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        if (b == 0) { err = ERR_ZERO; goto fail; }
+        values[sp - 1] %= b;
+        break;
+      case OP_EQ:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] == b);
+        break;
+      case OP_NE:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] != b);
+        break;
+      case OP_LT:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] < b);
+        break;
+      case OP_LE:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] <= b);
+        break;
+      case OP_GT:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] > b);
+        break;
+      case OP_GE:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] >= b);
+        break;
+      case OP_AND:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] != 0 && b != 0);
+        break;
+      case OP_OR:
+        if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
+        b = values[--sp];
+        values[sp - 1] = (values[sp - 1] != 0 || b != 0);
         break;
 
       case OP_NEG:

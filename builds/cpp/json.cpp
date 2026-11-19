@@ -22,6 +22,10 @@ struct JsonParser {
   int strings = 0;
   int stringBytes = 0;
 
+  static inline bool isDigit(unsigned char c) {
+    return static_cast<unsigned>(c - '0') <= 9;
+  }
+
   inline int fail(int code, int at) {
     errCode = code;
     errPos = at;
@@ -31,6 +35,7 @@ struct JsonParser {
   inline void skipWs() {
     while (pos < len) {
       unsigned char c = src[pos];
+      if (c > ' ') break;
       if (c != ' ' && c != '\t' && c != '\n' && c != '\r') break;
       ++pos;
     }
@@ -82,9 +87,8 @@ struct JsonParser {
       if (pos >= len) return fail(6, at);
       unsigned char c = src[pos++];
       int d;
-      if (c >= '0' && c <= '9') d = c - '0';
-      else if (c >= 'a' && c <= 'f') d = c - 'a' + 10;
-      else if (c >= 'A' && c <= 'F') d = c - 'A' + 10;
+      if (static_cast<unsigned>(c - '0') <= 9) d = c - '0';
+      else if (static_cast<unsigned>((c | 0x20) - 'a') <= 5) d = (c | 0x20) - 'a' + 10;
       else return fail(6, at);
       v = (v << 4) | d;
     }
@@ -161,9 +165,9 @@ struct JsonParser {
     unsigned char c = src[pos];
     if (c == '0') {
       ++pos;
-      if (pos < len && src[pos] >= '0' && src[pos] <= '9') return fail(5, pos);
-    } else if (c >= '1' && c <= '9') {
-      while (pos < len && src[pos] >= '0' && src[pos] <= '9') {
+      if (pos < len && isDigit(src[pos])) return fail(5, pos);
+    } else if (static_cast<unsigned>(c - '1') <= 8) {
+      while (pos < len && isDigit(src[pos])) {
         value = value * 10.0 + static_cast<double>(src[pos] - '0');
         ++pos;
       }
@@ -173,9 +177,9 @@ struct JsonParser {
 
     if (pos < len && src[pos] == '.') {
       ++pos;
-      if (pos >= len || src[pos] < '0' || src[pos] > '9') return fail(5, pos > len ? len : pos);
+      if (pos >= len || !isDigit(src[pos])) return fail(5, pos > len ? len : pos);
       double scale = 0.1;
-      while (pos < len && src[pos] >= '0' && src[pos] <= '9') {
+      while (pos < len && isDigit(src[pos])) {
         value += static_cast<double>(src[pos] - '0') * scale;
         scale *= 0.1;
         ++pos;
@@ -189,9 +193,9 @@ struct JsonParser {
         eneg = src[pos] == '-';
         ++pos;
       }
-      if (pos >= len || src[pos] < '0' || src[pos] > '9') return fail(5, pos > len ? len : pos);
+      if (pos >= len || !isDigit(src[pos])) return fail(5, pos > len ? len : pos);
       int exp = 0;
-      while (pos < len && src[pos] >= '0' && src[pos] <= '9') {
+      while (pos < len && isDigit(src[pos])) {
         if (exp < 10000) exp = exp * 10 + (src[pos] - '0');
         ++pos;
       }
@@ -290,46 +294,44 @@ struct JsonParser {
     int start = pos;
     ++nodes;
 
-    if (c == '{') {
-      if (depth == 1) rootType = 6;
-      return parseObject(depth);
+    switch (c) {
+      case '{':
+        if (depth == 1) rootType = 6;
+        return parseObject(depth);
+      case '[':
+        if (depth == 1) rootType = 5;
+        return parseArray(depth);
+      case '"':
+        if (depth == 1) rootType = 4;
+        return parseString(false, depth);
+      case 't':
+        if (pos + 4 <= len && src[pos + 1] == 'r' && src[pos + 2] == 'u' && src[pos + 3] == 'e') {
+          pos += 4;
+          if (depth == 1) rootType = 2;
+          return 1;
+        }
+        return fail(1, start);
+      case 'f':
+        if (pos + 5 <= len && src[pos + 1] == 'a' && src[pos + 2] == 'l' && src[pos + 3] == 's' && src[pos + 4] == 'e') {
+          pos += 5;
+          if (depth == 1) rootType = 1;
+          return 1;
+        }
+        return fail(1, start);
+      case 'n':
+        if (pos + 4 <= len && src[pos + 1] == 'u' && src[pos + 2] == 'l' && src[pos + 3] == 'l') {
+          pos += 4;
+          if (depth == 1) rootType = 0;
+          return 1;
+        }
+        return fail(1, start);
+      case '-':
+      case '0': case '1': case '2': case '3': case '4':
+      case '5': case '6': case '7': case '8': case '9':
+        return parseNumber(depth, start);
+      default:
+        return fail(1, pos);
     }
-    if (c == '[') {
-      if (depth == 1) rootType = 5;
-      return parseArray(depth);
-    }
-    if (c == '"') {
-      if (depth == 1) rootType = 4;
-      return parseString(false, depth);
-    }
-    if (c == 't') {
-      if (pos + 4 <= len && src[pos + 1] == 'r' && src[pos + 2] == 'u' && src[pos + 3] == 'e') {
-        pos += 4;
-        if (depth == 1) rootType = 2;
-        return 1;
-      }
-      return fail(1, start);
-    }
-    if (c == 'f') {
-      if (pos + 5 <= len && src[pos + 1] == 'a' && src[pos + 2] == 'l' && src[pos + 3] == 's' && src[pos + 4] == 'e') {
-        pos += 5;
-        if (depth == 1) rootType = 1;
-        return 1;
-      }
-      return fail(1, start);
-    }
-    if (c == 'n') {
-      if (pos + 4 <= len && src[pos + 1] == 'u' && src[pos + 2] == 'l' && src[pos + 3] == 'l') {
-        pos += 4;
-        if (depth == 1) rootType = 0;
-        return 1;
-      }
-      return fail(1, start);
-    }
-    if (c == '-' || (c >= '0' && c <= '9')) {
-      return parseNumber(depth, start);
-    }
-    return fail(1, pos);
   }
 
   int parse(int n) {

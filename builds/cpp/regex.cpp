@@ -495,49 +495,57 @@ __attribute__((visibility("default"))) i32 re_match(i32 len) {
       op = prog[ip * 4];
       a = prog[ip * 4 + 1];
       b = prog[ip * 4 + 2];
-      if (op == OP_CHAR) {
-        if (pos < len && text[pos] == a) {
-          pos++;
-          ip++;
+      switch (op) {
+        case OP_CHAR:
+          if (pos < len && text[pos] == a) {
+            pos++;
+            ip++;
+            continue;
+          }
+          break;
+        case OP_ANY:
+          if (pos < len && text[pos] != '\n') {
+            pos++;
+            ip++;
+            continue;
+          }
+          break;
+        case OP_CLASS:
+          if (pos < len && class_has(a, text[pos])) {
+            pos++;
+            ip++;
+            continue;
+          }
+          break;
+        case OP_BOL:
+          if (pos == 0) {
+            ip++;
+            continue;
+          }
+          break;
+        case OP_EOL:
+          if (pos == len) {
+            ip++;
+            continue;
+          }
+          break;
+        case OP_JMP:
+          ip = a;
           continue;
-        }
-      } else if (op == OP_ANY) {
-        if (pos < len && text[pos] != '\n') {
-          pos++;
-          ip++;
+        case OP_SPLIT:
+          if (bt >= STACK_CAP) {
+            fail(ERR_STACK, pos);
+            return -1;
+          }
+          bt_pc[bt] = b;
+          bt_pos[bt] = pos;
+          bt++;
+          ip = a;
           continue;
-        }
-      } else if (op == OP_CLASS) {
-        if (pos < len && class_has(a, text[pos])) {
-          pos++;
-          ip++;
-          continue;
-        }
-      } else if (op == OP_BOL) {
-        if (pos == 0) {
-          ip++;
-          continue;
-        }
-      } else if (op == OP_EOL) {
-        if (pos == len) {
-          ip++;
-          continue;
-        }
-      } else if (op == OP_JMP) {
-        ip = a;
-        continue;
-      } else if (op == OP_SPLIT) {
-        if (bt >= STACK_CAP) {
-          fail(ERR_STACK, pos);
-          return -1;
-        }
-        bt_pc[bt] = b;
-        bt_pos[bt] = pos;
-        bt++;
-        ip = a;
-        continue;
-      } else if (op == OP_MATCH) {
-        return 1;
+        case OP_MATCH:
+          return 1;
+        default:
+          break;
       }
       if (bt == 0) break;
       bt--;
