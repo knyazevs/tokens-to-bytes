@@ -95,7 +95,7 @@ function projectStats(data) {
   const minGzip = engines.reduce((a, b) => (a.gzip <= b.gzip ? a : b));
   const minBrotli = engines.reduce((a, b) => (a.brotli <= b.brotli ? a : b));
   const manual = engines.find((e) => e.id === 'manual');
-  const compiled = engines.filter((e) => e.id !== 'manual' && e.id !== 'manual-opt' && e.tokens);
+  const compiled = engines.filter((e) => !e.id.startsWith('manual') && e.tokens);
 
   let tokenRatio = null;
   if (manual?.tokens && compiled.length) {
@@ -369,7 +369,7 @@ function renderPaired(selector, sets) {
     body.innerHTML = '<tr><td colspan="5" class="quiet">Парные данные недоступны — нужен локальный сервер.</td></tr>';
     return;
   }
-  const order = ['manual', 'manual-opt', 'rust', 'as', 'c', 'cpp', 'cpp-opt'];
+  const order = ['manual', 'manual-opt', 'manual-v2', 'manual-v2-opt', 'rust', 'as', 'c', 'cpp', 'cpp-opt'];
   const names = new Map();
   for (const set of sets) {
     if (!set) continue;
@@ -499,9 +499,13 @@ function renderScatter(selector, data) {
   const dots = points.map((e) => {
     const cx = x(e.tokens.artifact);
     const cy = y(e.bytes);
-    const isManual = e.id === 'manual' || e.id === 'manual-opt';
+    const isManual = e.id.startsWith('manual');
     const dx = isManual ? -8 : 9;
-    const dy = e.id === 'manual-opt' ? -8 : (e.id === 'manual' ? 12 : 3);
+    let dy = 3;
+    if (e.id === 'manual') dy = 16;
+    else if (e.id === 'manual-opt') dy = -6;
+    else if (e.id === 'manual-v2') dy = 26;
+    else if (e.id === 'manual-v2-opt') dy = -16;
     const anchor = isManual ? 'end' : 'start';
     return `
       <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="5.5" fill="${e.tone}"/>

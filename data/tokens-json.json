@@ -1,6 +1,6 @@
 {
   "tokenizer": "o200k_base",
-  "generatedAt": "2026-11-19T16:20:37.164Z",
+  "generatedAt": "2026-11-19T17:06:31.002Z",
   "note": "artifactTokens — токены естественной формы артефакта (lower bound на стоимость генерации); binaryBase64Tokens — токены base64-представления wasm.",
   "engines": {
     "manual": {
@@ -12,6 +12,20 @@
     },
     "manual-opt": {
       "authoringFile": "projects/json/json.wat",
+      "authoringBytes": 29393,
+      "artifactTokens": 9556,
+      "binaryBase64Tokens": 2413,
+      "binaryBytes": 3029
+    },
+    "manual-v2": {
+      "authoringFile": "projects/json/json-v2.wat",
+      "authoringBytes": 29393,
+      "artifactTokens": 9556,
+      "binaryBase64Tokens": 2599,
+      "binaryBytes": 3271
+    },
+    "manual-v2-opt": {
+      "authoringFile": "projects/json/json-v2.wat",
       "authoringBytes": 29393,
       "artifactTokens": 9556,
       "binaryBase64Tokens": 2413,

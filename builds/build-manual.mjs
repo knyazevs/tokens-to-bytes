@@ -44,3 +44,22 @@ const optResult = process.platform === 'win32' && /\.cmd$/i.test(optBin)
 if (optResult.status === 0) {
   console.log(`${optOut}: ${fs.statSync(path.join(root, optOut)).size} B`);
 }
+
+const v2Src = 'projects/calculator/calc-v2.wat';
+const v2Out = 'projects/calculator/calc-v2.wasm';
+if (fs.existsSync(path.join(root, v2Src))) {
+  const v2Args = [v2Src, '-o', v2Out];
+  const r = process.platform === 'win32' && /\.cmd$/i.test(bin)
+    ? spawnSync(process.env.ComSpec || 'cmd.exe', ['/c', bin, ...v2Args], { cwd: root, stdio: 'inherit' })
+    : spawnSync(bin, v2Args, { cwd: root, stdio: 'inherit' });
+  if (r.status === 0) {
+    console.log(`${v2Out}: ${fs.statSync(path.join(root, v2Out)).size} B`);
+    const v2OptOut = 'projects/calculator/calc-v2-opt.wasm';
+    const optR = process.platform === 'win32' && /\.cmd$/i.test(optBin)
+      ? spawnSync(process.env.ComSpec || 'cmd.exe', ['/c', optBin, v2Out, '-Oz', '--enable-bulk-memory-opt', '-o', v2OptOut], { cwd: root, stdio: 'inherit' })
+      : spawnSync(optBin, [v2Out, '-Oz', '--enable-bulk-memory-opt', '-o', v2OptOut], { cwd: root, stdio: 'inherit' });
+    if (optR.status === 0) {
+      console.log(`${v2OptOut}: ${fs.statSync(path.join(root, v2OptOut)).size} B`);
+    }
+  }
+}

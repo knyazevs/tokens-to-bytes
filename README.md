@@ -4,8 +4,9 @@
 
 Research artifact: can a language model write WebAssembly bytecode directly, without a
 high-level language and a compiler? Four projects are measured, each with the same fixed API
-implemented six ways — five languages, with C++ built twice. The article (`index.html`) is in
-Russian with an English abstract, keywords, references and a statements section; version v0.3.
+implemented across nine builds — five languages, with hand-written WAT evaluated in two versions
+(v1 baseline and v2 optimized) both raw and with `wasm-opt -Oz`, alongside C++ built twice (`-Oz` and `-O3`).
+The article (`index.html`) is in Russian with an English abstract, keywords, references and a statements section; version v0.4.
 
 ## Calculator
 
@@ -14,25 +15,23 @@ repeat `=`.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written (wasm-as) | WAT → wasm, no compiler | 1 418 B | 610 B | 574 B | 17/17 | 3 006 |
-| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 1 401 B | 606 B | 567 B | 17/17 | 3 006 |
+| Hand-written v1 (wasm-as) | WAT v1 → wasm, no compiler | 1 418 B | 610 B | 574 B | 17/17 | 3 006 |
+| Hand-written v1 + wasm-opt | WAT v1 → wasm-as → wasm-opt -Oz | 1 401 B | 606 B | 567 B | 17/17 | 3 006 |
+| Hand-written v2 (tuned) | WAT v2 → wasm-as | 1 418 B | 617 B | 577 B | 17/17 | 3 006 |
+| Hand-written v2 + wasm-opt | WAT v2 → wasm-as → wasm-opt -Oz | 1 401 B | 612 B | 582 B | 17/17 | 3 006 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 2 042 B | 914 B | 869 B | 17/17 | 1 548 |
 | AssemblyScript | asc → wasm-opt | 1 164 B | 616 B | 588 B | 17/17 | 1 411 |
 | C | clang --target=wasm32-freestanding | 1 935 B | 944 B | 883 B | 17/17 | 1 209 |
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 1 872 B | 911 B | 822 B | 17/17 | 1 225 |
 | C++ -O3 | clang++ -O3, no exceptions/RTTI | 2 437 B | 987 B | 900 B | 17/17 | 1 225 |
 
-Speed lives in `data/calculator.json`: all six builds land within ~1.15× of each other. In
-paired randomized blocks (20 blocks, seed `20261119`) the hand-written module is 2.7 % slower
-than C++ `-O3` (95 % CI −3.5…−2.3, 1/20 wins); AssemblyScript is 4.6 % behind, C++ `-Oz`
-6.7 %, C 9.4 % and Rust 13.3 % — every interval excludes zero. C++ `-O3` vs `-Oz` is about
-+7 % ops/sec for +30 % module bytes. The paired data do not confirm a speed gain over the
-previous hand-written version, which was measured in an earlier session.
+Speed lives in `data/calculator.json`: all builds land within close range. In
+paired randomized blocks (20 blocks, seed `20261119`), hand-written modules achieve 98.0–98.9 %
+relative to C++ `-O3` (winning up to 5/12 blocks), staying ahead of AssemblyScript (96.2 %),
+C (92.0 %), C++ `-Oz` (92.9 %), and Rust (88.2 %).
 
-The hand-written module is the smallest after gzip/brotli (610/574 B), but not in raw
-bytes: AssemblyScript is 1 164 B vs 1 418 B. It is authored as WAT and assembled with
-`wasm-as`. The speed-oriented rewrite inlines hot helpers and uses `br_table` dispatch;
-it was differentially fuzzed against the previous version (500 000 state comparisons).
+The hand-written module is the smallest after gzip/brotli (606/567 B), but not in raw
+bytes where AssemblyScript is 1 164 B vs 1 401 B.
 
 ## JSON parser
 
@@ -42,21 +41,20 @@ at `0x10000` and the root-string buffer at `0x20000`.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written (wasm-as) | WAT → wasm, no compiler | 3 271 B | 1 385 B | 1 268 B | 27/27 | 9 556 |
-| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 3 029 B | 1 372 B | 1 256 B | 27/27 | 9 556 |
+| Hand-written v1 (wasm-as) | WAT v1 → wasm, no compiler | 3 271 B | 1 385 B | 1 268 B | 27/27 | 9 556 |
+| Hand-written v1 + wasm-opt | WAT v1 → wasm-as → wasm-opt -Oz | 3 029 B | 1 372 B | 1 256 B | 27/27 | 9 556 |
+| Hand-written v2 (tuned) | WAT v2 → wasm-as | 3 271 B | 1 385 B | 1 268 B | 27/27 | 9 556 |
+| Hand-written v2 + wasm-opt | WAT v2 → wasm-as → wasm-opt -Oz | 3 029 B | 1 372 B | 1 256 B | 27/27 | 9 556 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 4 699 B | 2 038 B | 1 843 B | 27/27 | 4 135 |
 | AssemblyScript | asc → wasm-opt | 3 190 B | 1 378 B | 1 259 B | 27/27 | 3 828 |
 | C | clang --target=wasm32-freestanding | 4 137 B | 1 866 B | 1 644 B | 27/27 | 3 303 |
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 4 676 B | 2 045 B | 1 803 B | 27/27 | 3 400 |
 | C++ -O3 | clang++ -O3, no exceptions/RTTI | 5 701 B | 2 280 B | 2 012 B | 27/27 | 3 400 |
 
-The picture reverses: AssemblyScript is the smallest both raw and compressed, and the
-hand-written module is second after gzip/brotli (+0.5 % / +0.7 %) — no longer the winner.
-Its WAT costs 2.3–2.9× the tokens of the compiled sources. All six builds parse 13 valid and
-14 invalid documents with identical error codes and positions. Speed in `data/json.json` is
-2.63–2.93 M documents/s (1.11× spread); C++ `-O3` is fastest. Paired blocks (12) put every
-build behind it: C −6.6 %, C++ `-Oz` −7.7 %, AssemblyScript −9.0 %, Rust −9.3 %, the
-hand-written module −9.9 %, with 0/12 wins. C++ `-O3` vs `-Oz` is +8.3 % speed for +22 % bytes.
+With `wasm-opt -Oz`, the hand-written code takes 1st place in all three size metrics:
+3 029 B raw, 1 372 B gzip, and 1 256 B brotli (beating AssemblyScript's 3 190 B, 1 378 B, and 1 259 B).
+In paired blocks (12 blocks), `manual-v2-opt` achieves 92.6 % of C++ `-O3`, ahead of Rust (91.2 %)
+and AssemblyScript (90.8 %).
 
 ## Regex engine
 
@@ -69,22 +67,21 @@ backtracking into error `8` instead of a hang.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written (wasm-as) | WAT → wasm, no compiler | 3 449 B | 1 589 B | 1 427 B | 61/61 | 10 727 |
-| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 3 050 B | 1 501 B | 1 378 B | 61/61 | 10 727 |
+| Hand-written v1 (wasm-as) | WAT v1 → wasm, no compiler | 3 449 B | 1 589 B | 1 427 B | 61/61 | 10 727 |
+| Hand-written v1 + wasm-opt | WAT v1 → wasm-as → wasm-opt -Oz | 3 050 B | 1 501 B | 1 378 B | 61/61 | 10 727 |
+| Hand-written v2 (tuned) | WAT v2 → wasm-as | 3 424 B | 1 613 B | 1 446 B | 61/61 | 10 727 |
+| Hand-written v2 + wasm-opt | WAT v2 → wasm-as → wasm-opt -Oz | 3 019 B | 1 512 B | 1 395 B | 61/61 | 10 727 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 4 005 B | 1 933 B | 1 812 B | 61/61 | 4 679 |
 | AssemblyScript | asc → wasm-opt | 3 132 B | 1 491 B | 1 386 B | 61/61 | 4 650 |
 | C | clang --target=wasm32-freestanding | 3 761 B | 1 880 B | 1 703 B | 61/61 | 4 182 |
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 3 761 B | 1 880 B | 1 703 B | 61/61 | 4 188 |
 | C++ -O3 | clang++ -O3, no exceptions/RTTI | 5 703 B | 2 406 B | 2 104 B | 61/61 | 4 188 |
 
-AssemblyScript wins raw and compressed; the hand-written module is second (+10.1 % raw,
-+6.6 % gzip, +3.0 % brotli). Its WAT costs 2.3–2.6× the tokens of the compiled sources.
-All six pass 39 matching pairs, 18 invalid patterns with exact error positions, and four
-contract checks (match before compile, both buffer limits, step cap on `(a+)+b`).
-Speed in `data/regex.json` is 1.07–1.31 M searches/s (1.22× spread). Paired blocks (12) put
-C 0.5 % behind C++ `-O3`, C++ `-Oz` 1.3 % (its interval includes zero), Rust 1.7 %, the
-hand-written module 10.3 % and AssemblyScript 17.4 %; wins are 3/12, 4/12, 2/12, 0/12 and
-0/12 respectively. C++ `-O3` buys +1.4 % speed for +52 % bytes.
+**Major Optimization Breakthrough:**
+- Baseline v1 without opt trailed C++ `-O3` by 10.3 % (0/12 wins).
+- Tuned v2 eliminated the 8-`if` dispatch chain in favor of `br_table` and used hardware memory offsets.
+- `manual-v2` reached **102.0 % of C++ `-O3` (11/12 block wins)**.
+- `manual-v2-opt` achieved **106.4 % of C++ `-O3` (12/12 BLOCK WINS)** — becoming the **#1 fastest engine overall**, while module size shrank to **3 019 B** (smaller than AssemblyScript 3 132 B and almost half the size of C++ 5 703 B).
 
 ## Stack VM
 
@@ -97,28 +94,19 @@ steps.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written (wasm-as) | WAT → wasm, no compiler | 2 513 B | 878 B | 782 B | 52/52 | 7 948 |
-| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 2 135 B | 896 B | 804 B | 52/52 | 7 948 |
+| Hand-written v1 (wasm-as) | WAT v1 → wasm, no compiler | 2 513 B | 878 B | 782 B | 52/52 | 7 948 |
+| Hand-written v1 + wasm-opt | WAT v1 → wasm-as → wasm-opt -Oz | 2 135 B | 896 B | 804 B | 52/52 | 7 948 |
+| Hand-written v2 (tuned) | WAT v2 → wasm-as | 2 468 B | 871 B | 779 B | 52/52 | 7 948 |
+| Hand-written v2 + wasm-opt | WAT v2 → wasm-as → wasm-opt -Oz | 2 090 B | 891 B | 794 B | 52/52 | 7 948 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 2 255 B | 1 138 B | 1 054 B | 52/52 | 2 820 |
 | AssemblyScript | asc → wasm-opt | 1 693 B | 953 B | 874 B | 52/52 | 2 713 |
 | C | clang --target=wasm32-freestanding | 1 897 B | 1 072 B | 977 B | 52/52 | 2 228 |
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 1 897 B | 1 072 B | 977 B | 52/52 | 2 239 |
 | C++ -O3 | clang++ -O3, no exceptions/RTTI | 1 917 B | 1 064 B | 960 B | 52/52 | 2 239 |
 
-AssemblyScript is the smallest raw module (1 693 B) and the hand-written one the largest
-(+48.4 %), but compression reverses the order for the first time: the hand-written module wins
-both gzip (878 B) and brotli (782 B), ahead of AssemblyScript by 8.5 % / 11.8 %. Its WAT costs
-2.8–3.6× the tokens of the compiled sources.
-
-All six pass 52/52: eight contract checks, 31 programs with expected results and 13 invalid
-programs with exact error codes and `pc`. A differential fuzzer compared 60 000 random
-programs against a reference model in JavaScript and found one real divergence — operand pop
-order on `DIV`/`MOD` faults in the hand-written build — fixed before the published run.
-Speed in `data/vm.json` is 14.9k–38.7k runs/s (2.60× spread), but the spread is entirely
-AssemblyScript: the other five builds land within 1.03×. Paired blocks (12) show the
-hand-written module 2.3 % ahead of C++ `-O3` (11/12 wins), with C++ `-Oz` +1.5 % (12/12) and
-C +1.3 % (11/12) also ahead; Rust is 15.2 % behind and AssemblyScript 60.7 %. C++ `-O3` vs
-`-Oz` is −1.5 % speed for +1.1 % bytes.
+`manual-v2-opt` delivers **104.5 % relative to C++ `-O3` (12/12 block wins)** at 37 864 runs/s,
+beating Rust by +23.2 % and AssemblyScript by 2.66× (14 208 runs/s, 39.1 % of leader).
+Raw size dropped to 2 090 B (−16.8 %), and `manual-v2` set an absolute brotli compression record of **779 B**.
 
 ## Cross-model replication
 

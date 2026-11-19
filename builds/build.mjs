@@ -63,7 +63,7 @@ const wasmOpt = process.env.WASM_OPT || localBin('wasm-opt') || 'wasm-opt';
 const asc = process.env.ASC || localBin('asc') || 'asc';
 
 async function buildManual() {
-  if (!want('manual') && !want('manual-opt')) return;
+  if (!want('manual') && !want('manual-opt') && !want('manual-v2') && !want('manual-v2-opt')) return;
   const { src, out } = project.manual;
   run(wasmAs, [src, '-o', out]);
   report(out);
@@ -73,6 +73,19 @@ async function buildManual() {
   run(wasmOpt, [out, '-Oz', '--enable-bulk-memory-opt', '-o', optOut]);
   report(optOut);
   await validate(optOut);
+
+  const v2Src = src.replace(/\.wat$/, '-v2.wat');
+  if (fs.existsSync(path.join(root, v2Src))) {
+    const v2Out = out.replace(/\.wasm$/, '-v2.wasm');
+    run(wasmAs, [v2Src, '-o', v2Out]);
+    report(v2Out);
+    await validate(v2Out);
+
+    const v2OptOut = out.replace(/\.wasm$/, '-v2-opt.wasm');
+    run(wasmOpt, [v2Out, '-Oz', '--enable-bulk-memory-opt', '-o', v2OptOut]);
+    report(v2OptOut);
+    await validate(v2OptOut);
+  }
 }
 
 async function buildC() {
