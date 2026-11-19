@@ -54,19 +54,24 @@ async function loadJson(path) {
 function fail(message) {
   const tables = {
     '#setup-table tbody': 4,
-    '#results-table tbody': 7,
-    '#spread-table tbody': 6,
+    '#results-table tbody': 11,
+    '#spread-table tbody': 9,
+    '#coverage-table tbody': 3,
     '#json-setup-table tbody': 4,
-    '#json-results-table tbody': 7,
-    '#json-spread-table tbody': 6,
+    '#json-results-table tbody': 11,
+    '#json-spread-table tbody': 9,
+    '#json-coverage-table tbody': 3,
     '#regex-setup-table tbody': 4,
-    '#regex-results-table tbody': 7,
-    '#regex-spread-table tbody': 6,
+    '#regex-results-table tbody': 11,
+    '#regex-spread-table tbody': 9,
+    '#regex-coverage-table tbody': 3,
     '#vm-setup-table tbody': 4,
-    '#vm-results-table tbody': 7,
-    '#vm-spread-table tbody': 6,
+    '#vm-results-table tbody': 11,
+    '#vm-spread-table tbody': 9,
+    '#vm-coverage-table tbody': 3,
     '#paired-table tbody': 5,
-    '#replication-table tbody': 6,
+    '#replication-table tbody': 9,
+    '#replication-detail-table tbody': 6,
   };
   for (const [sel, cols] of Object.entries(tables)) {
     const body = $(sel);
@@ -195,17 +200,29 @@ function renderSetup(selector, data) {
 function renderResults(selector, data, testAttr) {
   const body = $(selector);
   if (!body) return;
-  body.innerHTML = data.engines.map((e) => `
+  body.innerHTML = data.engines.map((e) => {
+    const gzR = e.bytes ? (e.gzip / e.bytes) * 100 : 0;
+    const ss = sampleSummary(e.perf.samples) || (e.perf.stats ? { ...e.perf.stats, cv: e.perf.stats.mean ? (e.perf.stats.stddev / e.perf.stats.mean) * 100 : 0 } : null);
+    const cv = ss ? fmtPct(ss.cv, 1) : '—';
+    const tArt = e.tokens ? fmtInt(e.tokens.artifact) : '—';
+    const tB64 = e.tokens?.base64 ? fmtInt(e.tokens.base64) : '—';
+    const tPerTest = e.tokens ? fmtDec(e.tokens.artifact / e.tests.total, 1) : '—';
+    return `
     <tr>
       <td><span class="dot-key" style="background:${e.tone}"></span><b>${e.name}</b></td>
       <td class="strong">${fmtInt(e.bytes)}</td>
       <td>${fmtInt(e.gzip)}</td>
       <td>${fmtInt(e.brotli)}</td>
+      <td>${fmtPct(gzR, 0)}</td>
       <td data-${testAttr}="${e.id}"><span class="pill ok">${e.tests.passed}/${e.tests.total}</span></td>
-      <td>${fmtInt(e.perf.opsPerSec)}</td>
-      <td>${e.tokens ? fmtInt(e.tokens.artifact) : '—'}</td>
+      <td>${fmtOps(e.perf.opsPerSec)}</td>
+      <td>${cv}</td>
+      <td>${tArt}</td>
+      <td>${tB64}</td>
+      <td>${tPerTest}</td>
     </tr>
-  `).join('');
+  `;
+  }).join('');
 }
 
 function renderChart(selector, data, metric) {
@@ -231,24 +248,109 @@ const fmtOps = (v) => {
   return `${(v / scale).toFixed(digits).replace('.', ',')}${unit}`;
 };
 
+const fmtPct = (v, digits = 1) => `${Number(v).toFixed(digits).replace('.', ',')} %`;
+const fmtRatio = (v) => `${Number(v).toFixed(2).replace('.', ',')}×`;
+
+function percentile(sorted, p) {
+  if (!sorted.length) return 0;
+  const i = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+function sampleSummary(samples) {
+  if (!samples?.length) return null;
+  const sorted = [...samples].sort((a, b) => a - b);
+  const n = sorted.length;
+  const mean = samples.reduce((s, v) => s + v, 0) / n;
+  const variance = samples.reduce((s, v) => s + (v - mean) ** 2, 0) / n;
+  const stddev = Math.sqrt(variance);
+  const median = percentile(sorted, 50);
+  return {
+    min: sorted[0],
+    max: sorted[n - 1],
+    mean,
+    median,
+    stddev,
+    cv: mean ? (stddev / mean) * 100 : 0,
+    p5: percentile(sorted, 5),
+    p95: percentile(sorted, 95),
+    n,
+  };
+}
+
+function median(values) {
+  const s = [...values].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+function bootstrapMedianCI(samples, iters = 2000, alpha = 0.05) {
+  if (!samples || samples.length < 2) return null;
+  const n = samples.length;
+  const meds = new Array(iters);
+  for (let i = 0; i < iters; i++) {
+    const draw = new Array(n);
+    for (let j = 0; j < n; j++) draw[j] = samples[(Math.random() * n) | 0];
+    meds[i] = median(draw);
+  }
+  meds.sort((a, b) => a - b);
+  const lo = meds[Math.floor((alpha / 2) * iters)];
+  const hi = meds[Math.floor((1 - alpha / 2) * iters)];
+  return { lo, hi };
+}
+
+const TEST_COVERAGE = {
+  calculator: [
+    { name: 'Базовая арифметика и дроби', cases: 5, note: 'сложение, умножение, вычитание, деление, десятичные' },
+    { name: 'Цепочки и повтор операций', cases: 4, note: 'левоассоциативная цепочка, повтор =, цепочка после результата' },
+    { name: 'Ввод и редактирование', cases: 5, note: 'backspace, дробная часть, смена знака, ввод после neg' },
+    { name: 'Ошибки и восстановление', cases: 2, note: 'деление на ноль и ввод после ошибки' },
+    { name: 'Формула и операнды', cases: 1, note: 'display/leftOperand/operand после = и повтор =' },
+  ],
+  json: [
+    { name: 'Корректные документы', cases: 13, note: 'примитивы, числа, строки, escape/unicode, массивы, объекты, вложенность, пробелы' },
+    { name: 'Некорректные входы', cases: 14, note: 'обрыв, лишние токены, ошибки синтаксиса чисел/строк, нарушение структуры, глубина' },
+  ],
+  regex: [
+    { name: 'Контракт и состояние API', cases: 4, note: 'match до компиляции, reset, пустой паттерн/текст, указатели буферов' },
+    { name: 'Сопоставление (match/no-match)', cases: 39, note: 'якоря, классы, квантификаторы, группы, альтернативы, escape-последовательности' },
+    { name: 'Ошибки компиляции паттерна', cases: 18, note: 'скобки, классы символов, диапазоны, escape, недопустимые квантификаторы' },
+  ],
+  vm: [
+    { name: 'Контракт и состояние API', cases: 8, note: 'reset/load/run/step, указатели, доступ к регистрам и стеку' },
+    { name: 'Корректные программы', cases: 31, note: 'арифметика, стековые операции, ветвления, циклы, вызовы, локалы, halt/result' },
+    { name: 'Ошибки загрузки и выполнения', cases: 13, note: 'неизвестный опкод, адреса, локалы, under/overflow, деление на ноль, возврат' },
+  ],
+};
+
 function renderSpread(selector, data) {
   const body = $(selector);
   if (!body) return;
-  const rows = data.engines.filter((e) => e.perf.stats);
+  const rows = data.engines.filter((e) => e.perf.samples || e.perf.stats);
   if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="6" class="quiet">Разброс не записан в данных.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="quiet">Разброс не записан в данных.</td></tr>';
     return;
   }
   body.innerHTML = rows.map((e) => {
-    const s = e.perf.stats;
+    const s = sampleSummary(e.perf.samples) || e.perf.stats;
+    if (!s) return '';
+    const cv = s.cv ?? (s.mean ? (s.stddev / s.mean) * 100 : 0);
+    const p5 = s.p5 ?? s.min;
+    const p95 = s.p95 ?? s.max;
     return `
       <tr>
         <td><span class="dot-key" style="background:${e.tone}"></span><b>${e.name}</b></td>
         <td>${fmtOps(s.min)}</td>
-        <td>${fmtOps(s.mean)}</td>
+        <td>${fmtOps(p5)}</td>
         <td class="strong">${fmtOps(s.median)}</td>
+        <td>${fmtOps(s.mean)}</td>
+        <td>${fmtOps(p95)}</td>
         <td>${fmtOps(s.max)}</td>
         <td class="quiet">${fmtOps(s.stddev)}</td>
+        <td>${fmtPct(cv, 1)}</td>
       </tr>
     `;
   }).join('');
@@ -295,23 +397,85 @@ function renderReplication(selector, data) {
   const body = $(selector);
   if (!body) return;
   if (!data?.runs?.length) {
-    body.innerHTML = '<tr><td colspan="6" class="quiet">Журналы репликации недоступны — нужен локальный сервер.</td></tr>';
+    body.innerHTML = '<tr><td colspan="9" class="quiet">Журналы репликации недоступны — нужен локальный сервер.</td></tr>';
     return;
   }
   body.innerHTML = data.runs.map((run) => {
     const f = run.final ?? {};
     const tests = `${f.passed ?? 0}/${f.total ?? 17}`;
+    const compileFails = (run.log || []).filter((r) => r.compiled === false).length;
+    const testFails = (run.log || []).filter((r) => r.compiled !== false && r.passed !== r.total).length;
+    const firstPass = run.iterations === 1 && run.failedIterations === 0 ? 'да' : 'нет';
     return `
       <tr>
         <td><b>${run.model}</b></td>
         <td>${fmtInt(run.iterations)}</td>
         <td>${fmtInt(run.failedIterations)}</td>
+        <td>${fmtInt(compileFails)} / ${fmtInt(testFails)}</td>
         <td>${fmtInt(run.distinctDefects.length)}</td>
+        <td>${firstPass}</td>
         <td>${fmtInt(run.artifactTokens)}</td>
+        <td>${fmtInt(run.authoringBytes ?? 0)}</td>
         <td class="${f.passed === f.total ? 'strong' : ''}">${tests}</td>
       </tr>
     `;
   }).join('');
+}
+
+function renderReplicationDetail(selector, data) {
+  const body = $(selector);
+  if (!body) return;
+  if (!data?.runs?.length) {
+    body.innerHTML = '<tr><td colspan="6" class="quiet">Журналы репликации недоступны — нужен локальный сервер.</td></tr>';
+    return;
+  }
+  body.innerHTML = data.runs.flatMap((run) => {
+    const log = run.log || [];
+    if (!log.length) return [`<tr><td><b>${run.model}</b></td><td colspan="5" class="quiet">нет записей</td></tr>`];
+    return log.map((it, idx) => {
+      let type = 'успех';
+      if (it.compiled === false) type = 'ошибка компиляции';
+      else if (it.passed !== it.total) type = 'провал тестов';
+      const res = `${it.passed ?? 0}/${it.total ?? 17}`;
+      const note = (it.note || '—').replace(/</g, '&lt;');
+      const first = idx === 0 ? `<td rowspan="${log.length}"><b>${run.model}</b></td>` : '';
+      const cls = (type === 'успех') ? '' : ' class="quiet"';
+      return `
+      <tr${cls}>
+        ${first}
+        <td>${fmtInt(it.seq ?? idx + 1)}</td>
+        <td>${type}</td>
+        <td class="${it.passed === it.total ? 'strong' : ''}">${res}</td>
+        <td>${it.compiled === false ? 'нет' : 'да'}</td>
+        <td style="text-align:left">${note}</td>
+      </tr>`;
+    });
+  }).join('');
+}
+
+function renderTestCoverage(selector, slug, data) {
+  const body = $(selector);
+  if (!body) return;
+  const cats = TEST_COVERAGE[slug];
+  if (!cats) {
+    body.innerHTML = '<tr><td colspan="3" class="quiet">Нет данных о категориях.</td></tr>';
+    return;
+  }
+  const total = cats.reduce((s, c) => s + c.cases, 0);
+  const t = data?.engines?.[0]?.tests;
+  const status = t ? `${t.passed}/${t.total} у всех сборок` : '—';
+  body.innerHTML = cats.map((c) => `
+    <tr>
+      <td><b>${c.name}</b></td>
+      <td>${fmtInt(c.cases)}</td>
+      <td style="text-align:left" class="quiet">${c.note}</td>
+    </tr>
+  `).join('') + `
+    <tr>
+      <td><b>Итого</b></td>
+      <td class="strong">${fmtInt(total)}</td>
+      <td style="text-align:left" class="quiet">${status} (в опубликованных данных)</td>
+    </tr>`;
 }
 
 function renderScatter(selector, data) {
@@ -628,6 +792,8 @@ if (calculator) {
     paired.vm,
   ]);
   renderReplication('#replication-table tbody', replication);
+  renderReplicationDetail('#replication-detail-table tbody', replication);
+  renderTestCoverage('#coverage-table tbody', 'calculator', calculator);
   initMetric('#calculator-metric', '#size-chart', calculator);
   initVerify({
     data: calculator,
@@ -663,6 +829,7 @@ if (json) {
   renderSetup('#json-setup-table tbody', json);
   renderResults('#json-results-table tbody', json, 'json-engine-tests');
   renderSpread('#json-spread-table tbody', json);
+  renderTestCoverage('#json-coverage-table tbody', 'json', json);
   renderChart('#json-size-chart', json, 'bytes');
   renderScatter('#json-scatter', json);
   initMetric('#json-metric', '#json-size-chart', json);
@@ -702,6 +869,7 @@ if (regex) {
   renderSetup('#regex-setup-table tbody', regex);
   renderResults('#regex-results-table tbody', regex, 'regex-engine-tests');
   renderSpread('#regex-spread-table tbody', regex);
+  renderTestCoverage('#regex-coverage-table tbody', 'regex', regex);
   renderChart('#regex-size-chart', regex, 'bytes');
   renderScatter('#regex-scatter', regex);
   initMetric('#regex-metric', '#regex-size-chart', regex);
@@ -741,6 +909,7 @@ if (vm) {
   renderSetup('#vm-setup-table tbody', vm);
   renderResults('#vm-results-table tbody', vm, 'vm-engine-tests');
   renderSpread('#vm-spread-table tbody', vm);
+  renderTestCoverage('#vm-coverage-table tbody', 'vm', vm);
   renderChart('#vm-size-chart', vm, 'bytes');
   renderScatter('#vm-scatter', vm);
   initMetric('#vm-metric', '#vm-size-chart', vm);

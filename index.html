@@ -179,13 +179,13 @@ error() → i32        operand() → f64    leftOperand() → f64
         <p class="lede">Что и как измеряется — с явными границами применимости.</p>
 
         <h3>Метрики</h3>
+        <p>Каждая метрика публикуется не одним числом, а набором показателей — чтобы сравнение было проверяемым, а не зависело от удачного замера или одного счётчика.</p>
         <ul>
-          <li><em class="term">Токены артефакта</em> — <code>countTokens</code> (o200k_base) от естественной формы: исходник на языке реализации или WAT для ручного байткода. Это нижняя граница стоимости генерации: модель ещё тратит токены на рассуждение, ошибки и правки.</li>
-          <li><em class="term">Токены генерации</em> — <code>usage.output_tokens</code> конкретного прогона. Для основной серии не измерялись; протокол для будущих прогонов описан ниже.</li>
-          <li><em class="term">Итерации и дефекты</em> — число циклов «правка → сборка → тест» и различных причин провала в журнале пилотной репликации. Это нижняя граница: журнал фиксирует только то, что модель сама запустила через помощник. Полное число ошибок модели по-прежнему неизвестно.</li>
-          <li><em class="term">Тесты</em> — 16 сценариев ввода/арифметики и одна проверка формулы после <code>=</code>. Один и тот же код выполняется в Node и в браузере.</li>
-          <li><em class="term">ops/sec</em> — вызовы API в секунду на детерминированной нагрузке. Каждая сборка измеряется в отдельном процессе Node: прогрев 750 мс, затем десять окон по 150 мс, шесть таких процессов; медиана по всем <span data-stat="samples">60</span> замерам. Рядом с медианой публикуются минимум, среднее, максимум и стандартное отклонение — они показывают шум, который медиана скрывает. Для JSON-парсера одна операция — разбор одного документа, поэтому единица в таблице — документы в секунду; протокол и число замеров те же.</li>
-          <li><em class="term">Размер</em> — байты модуля, gzip уровня 9 и brotli качества 11.</li>
+          <li><em class="term">Токены</em> — <b>авторинг</b>: <code>countTokens</code> (o200k_base) естественной формы (исходник/WAT), нижняя граница стоимости записи; <b>base64</b>: токены бинарного представления wasm; <b>эффективность</b>: токены авторинга на тест (<code>ток./тест</code>). Отдельно описаны <b>токены генерации</b> (<code>usage.*</code> за чистый прогон, включая стоимость доработок) — для основной серии не измерялись, протокол ниже.</li>
+          <li><em class="term">Корректность</em> — сводный итог <code>пройдено/всего</code> и разбивка по категориям протокола (арифметика, ввод/редактирование, цепочки/состояние, ошибки, формула — для калькулятора; для остальных проектов — контракт, корректные случаи и некорректные входы). Разбивка показывает, <em>что именно</em> покрыто тестами, а не только итоговый счёт.</li>
+          <li><em class="term">Производительность</em> — стационарная пропускная способность (медиана ops/s, отдельный процесс на сборку: 750 мс прогрев, 10×150 мс, 6 процессов, <span data-stat="samples">60</span> замеров) и профиль разброса: мин/p5/медиана/среднее/p95/макс, σ и коэффициент вариации CV. Для различий в единицы процентов используется парное сравнение: отношение к C++ <code>-O3</code> внутри рандомизированных блоков с 95 % бутстреп-интервалом и числом побед. Единицы: калькулятор — вызовы API/с; JSON — документы/с; regex — сопоставления/с; VM — программы/с.</li>
+          <li><em class="term">Размер</em> — байты <code>.wasm</code>, <code>gzip</code> (ур. 9), <code>brotli</code> (кач. 11) и коэффициент сжатия <code>gzip/raw</code>, показывающий долю исходного размера после переноса.</li>
+          <li><em class="term">Процесс генерации</em> (пилотная репликация) — число итераций, провалов и их тип (компиляция/тесты), число задокументированных причин, сходимость (успех с первой попытки), итоговые тесты, токены и байты артефакта, а также журнал каждой итерации с заметкой. Это нижняя граница: в журнал попадает только то, что прошло через помощник.</li>
         </ul>
 
         <h3>Нагрузка</h3>
@@ -240,32 +240,53 @@ error() → i32        operand() → f64    leftOperand() → f64
           <table class="data" id="results-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th>
-                <th>Тесты</th><th>ops/sec (медиана)</th><th>Токены</th>
+                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th><th>gzip/raw</th>
+                <th>Тесты</th><th>ops/s (мед.)</th><th>CV</th>
+                <th>Токены авт.</th><th>Токены b64</th><th>Ток./тест</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="7" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="11" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="notes">
+          <span><b>gzip/raw</b> — доля размера после gzip; <b>CV</b> — коэффициент вариации (σ/среднее) по 60 замерам; <b>Ток./тест</b> — токены авторинга на один тест протокола.</span>
+        </p>
         <p class="live-status" id="verify-status" role="status">Данные из <code>data/calculator.json</code>, собранные Node-бенчмарком.</p>
 
-        <p>Медиана отвечает на вопрос «как быстро сборка обычно работает», но скрывает шум. Ниже — тот же прогон по <span data-stat="samples">60</span> замерам на сборку: минимум, среднее, медиана, максимум и стандартное отклонение σ. Чем шире коридор, тем меньше смысла в разнице между соседними реализациями.</p>
+        <p>Медиана отвечает на вопрос «как быстро сборка обычно работает», но скрывает шум и форму распределения. Ниже — профиль по <span data-stat="samples">60</span> замерам: хвосты (мин/p5/p95/макс), центр (медиана/среднее) и устойчивость (σ, CV). Чем шире хвосты и выше CV, тем осторожнее нужно читать близкие различия.</p>
 
         <div class="table-wrap">
           <table class="data" id="spread-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>мин</th><th>среднее</th><th>медиана</th><th>макс</th><th>σ</th>
+                <th>Реализация</th><th>мин</th><th>p5</th><th>медиана</th><th>среднее</th><th>p95</th><th>макс</th><th>σ</th><th>CV</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="9" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="live-status">Числа — миллионы вызовов API в секунду (M ops/sec); σ — стандартное отклонение по всем замерам сборки.</p>
+        <p class="notes">
+          <span>Единицы: M ops/sec; <b>p5/p95</b> — 5-й и 95-й перцентили; <b>CV</b> — коэффициент вариации (σ/среднее).</span>
+        </p>
+
+        <h3>Покрытие тестов по категориям</h3>
+        <p>Итог «17/17» дробится на категории протокола: видно, какие классы поведения реально проверяются (все шесть сборок проходят все категории в опубликованных данных).</p>
+        <div class="table-wrap">
+          <table class="data" id="coverage-table">
+            <thead>
+              <tr>
+                <th>Категория</th><th>Кейсов</th><th>Что проверяется</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="3" class="quiet">Загрузка категорий…</td></tr>
+            </tbody>
+          </table>
+        </div>
 
         <figure>
           <svg class="scatter" id="scatter" viewBox="0 0 640 300" role="img" aria-label="Токены артефакта против размера модуля"></svg>
@@ -320,19 +341,45 @@ error() → i32        operand() → f64    leftOperand() → f64
                 <th>Модель</th>
                 <th>Итераций</th>
                 <th>Провалов</th>
-                <th>Дефектов</th>
-                <th>Токены артефакта</th>
+                <th>Компил./тесты</th>
+                <th>Причин</th>
+                <th>С 1-й</th>
+                <th>Токены авт.</th>
+                <th>Байт</th>
                 <th>Тесты</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="quiet">Загрузка журналов репликации…</td></tr>
+              <tr><td colspan="9" class="quiet">Загрузка журналов репликации…</td></tr>
             </tbody>
           </table>
         </div>
         <p class="notes">
-          <span>Задача: калькулятор на C, 17 общих тестов; песочница не содержит эталонного кода.</span>
-          <span>Скрипт: <code>builds/replication.mjs</code>; данные: <code>data/replication.json</code>.</span>
+          <span><b>Компил./тесты</b> — провалы из-за ошибки компиляции и из-за падения тестов; <b>Причин</b> — число различных задокументированных причин провала.</span>
+          <span>Задача: калькулятор на C, 17 общих тестов; песочница без эталонного кода.</span>
+        </p>
+
+        <h4>Журнал итераций</h4>
+        <p>Каждая строка — один запуск «правка → сборка → тест», зафиксированный помощником (тип, результат, компиляция, заметка модели). Это и есть наблюдаемый след ошибок и доработок.</p>
+        <div class="table-wrap">
+          <table class="data" id="replication-detail-table">
+            <thead>
+              <tr>
+                <th>Модель</th>
+                <th>№</th>
+                <th>Тип</th>
+                <th>Тесты</th>
+                <th>Сборка</th>
+                <th>Заметка</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" class="quiet">Загрузка журнала…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="notes">
+          <span>Скрипт: <code>builds/replication.mjs</code>; данные: <code>data/replication.json</code>. Наблюдаемая нижняя граница процесса.</span>
         </p>
       </section>
 
@@ -388,15 +435,19 @@ json_strings() · json_string_bytes()</code></pre>
           <table class="data" id="json-results-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th>
-                <th>Тесты</th><th>док./с (медиана)</th><th>Токены</th>
+                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th><th>gzip/raw</th>
+                <th>Тесты</th><th>док./с (мед.)</th><th>CV</th>
+                <th>Токены авт.</th><th>Токены b64</th><th>Ток./тест</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="7" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="11" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="notes">
+          <span><b>gzip/raw</b> — доля размера после gzip; <b>CV</b> — коэффициент вариации по 60 замерам; <b>Ток./тест</b> — токены авторинга на тест.</span>
+        </p>
         <p class="live-status" id="json-verify-status" role="status">Данные из <code>data/json.json</code> от <span id="json-updated">…</span>, собранные Node-бенчмарком.</p>
 
         <p>Одна операция нагрузки — разбор одного документа; за проход проходят 13 документов: объекты, массивы, вложенность, экспоненциальная запись чисел, escape-последовательности, суррогатные пары и все корневые типы. Медиана по <span data-stat="json-samples">60</span> замерам на сборку; σ — <span data-stat="json-noise-min">1,5</span>–<span data-stat="json-noise-max">3,8</span> % от медианы.</p>
@@ -405,15 +456,29 @@ json_strings() · json_string_bytes()</code></pre>
           <table class="data" id="json-spread-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>мин</th><th>среднее</th><th>медиана</th><th>макс</th><th>σ</th>
+                <th>Реализация</th><th>мин</th><th>p5</th><th>медиана</th><th>среднее</th><th>p95</th><th>макс</th><th>σ</th><th>CV</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="9" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="live-status">Числа — миллионы документов в секунду (M док./с); σ — стандартное отклонение по всем замерам сборки.</p>
+        <p class="notes">
+          <span>Единицы: M док./с; <b>p5/p95</b> — перцентили хвостов; <b>CV</b> — σ/среднее.</span>
+        </p>
+
+        <h3>Покрытие тестов по категориям</h3>
+        <div class="table-wrap">
+          <table class="data" id="json-coverage-table">
+            <thead>
+              <tr><th>Категория</th><th>Кейсов</th><th>Что проверяется</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="3" class="quiet">Загрузка категорий…</td></tr>
+            </tbody>
+          </table>
+        </div>
 
         <figure>
           <svg class="scatter" id="json-scatter" viewBox="0 0 640 300" role="img" aria-label="Токены артефакта против размера JSON-модуля"></svg>
@@ -521,15 +586,19 @@ re_steps()                     // шагов VM в последнем поиск
           <table class="data" id="regex-results-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th>
-                <th>Тесты</th><th>поисков/с (медиана)</th><th>Токены</th>
+                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th><th>gzip/raw</th>
+                <th>Тесты</th><th>совп./с (мед.)</th><th>CV</th>
+                <th>Токены авт.</th><th>Токены b64</th><th>Ток./тест</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="7" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="11" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="notes">
+          <span><b>gzip/raw</b> — доля размера после gzip; <b>CV</b> — коэффициент вариации по 60 замерам; <b>Ток./тест</b> — токены авторинга на тест.</span>
+        </p>
         <p class="live-status" id="regex-verify-status" role="status">Данные из <code>data/regex.json</code> от <span id="regex-updated">…</span>, собранные Node-бенчмарком.</p>
 
         <p>Одна операция нагрузки — компиляция шаблона и один поиск по тексту; за проход проходят 12 пар. Тексты — от коротких строк до нескольких сотен байт, включая «почти совпадающие», где бэктрекинг делает больше работы. Медиана по <span data-stat="regex-samples">60</span> замерам на сборку; σ — <span data-stat="regex-noise-min">1,3</span>–<span data-stat="regex-noise-max">3,4</span> % от медианы.</p>
@@ -538,15 +607,29 @@ re_steps()                     // шагов VM в последнем поиск
           <table class="data" id="regex-spread-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>мин</th><th>среднее</th><th>медиана</th><th>макс</th><th>σ</th>
+                <th>Реализация</th><th>мин</th><th>p5</th><th>медиана</th><th>среднее</th><th>p95</th><th>макс</th><th>σ</th><th>CV</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="9" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="live-status">Числа — миллионы поисков в секунду (M поисков/с); σ — стандартное отклонение по всем замерам сборки.</p>
+        <p class="notes">
+          <span>Единицы: M совп./с; <b>p5/p95</b> — перцентили хвостов; <b>CV</b> — σ/среднее.</span>
+        </p>
+
+        <h3>Покрытие тестов по категориям</h3>
+        <div class="table-wrap">
+          <table class="data" id="regex-coverage-table">
+            <thead>
+              <tr><th>Категория</th><th>Кейсов</th><th>Что проверяется</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="3" class="quiet">Загрузка категорий…</td></tr>
+            </tbody>
+          </table>
+        </div>
 
         <figure>
           <svg class="scatter" id="regex-scatter" viewBox="0 0 640 300" role="img" aria-label="Токены артефакта против размера regex-модуля"></svg>
@@ -655,15 +738,19 @@ vm_error() · vm_pc() · vm_steps()</code></pre>
           <table class="data" id="vm-results-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th>
-                <th>Тесты</th><th>прогонов/с (медиана)</th><th>Токены</th>
+                <th>Реализация</th><th>.wasm</th><th>gzip</th><th>brotli</th><th>gzip/raw</th>
+                <th>Тесты</th><th>прогр./с (мед.)</th><th>CV</th>
+                <th>Токены авт.</th><th>Токены b64</th><th>Ток./тест</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="7" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="11" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
+        <p class="notes">
+          <span><b>gzip/raw</b> — доля размера после gzip; <b>CV</b> — коэффициент вариации по 60 замерам; <b>Ток./тест</b> — токены авторинга на тест.</span>
+        </p>
         <p class="live-status" id="vm-verify-status" role="status">Данные из <code>data/vm.json</code> от <span id="vm-updated">…</span>, собранные Node-бенчмарком.</p>
 
         <p>Одна операция нагрузки — <code>vm_load</code> и полный прогон одной программы до <code>HALT</code>; за проход проходят 10 программ: 10!, fib(18), НОД(1071, 462), сумма квадратов, 3<sup>13</sup>, Коллатц(27), простые до 200, Аккерман(2, 3), рекурсия глубиной 100 и сумма цифр. Медиана по <span data-stat="vm-samples">60</span> замерам на сборку; σ — <span data-stat="vm-noise-min">1,0</span>–<span data-stat="vm-noise-max">2,1</span> % от медианы.</p>
@@ -672,15 +759,29 @@ vm_error() · vm_pc() · vm_steps()</code></pre>
           <table class="data" id="vm-spread-table">
             <thead>
               <tr>
-                <th>Реализация</th><th>мин</th><th>среднее</th><th>медиана</th><th>макс</th><th>σ</th>
+                <th>Реализация</th><th>мин</th><th>p5</th><th>медиана</th><th>среднее</th><th>p95</th><th>макс</th><th>σ</th><th>CV</th>
               </tr>
             </thead>
             <tbody>
-              <tr><td colspan="6" class="quiet">Загрузка измерений…</td></tr>
+              <tr><td colspan="9" class="quiet">Загрузка измерений…</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="live-status">Числа — тысячи прогонов в секунду (k прогонов/с); σ — стандартное отклонение по всем замерам сборки.</p>
+        <p class="notes">
+          <span>Единицы: k прогр./с; <b>p5/p95</b> — перцентили хвостов; <b>CV</b> — σ/среднее.</span>
+        </p>
+
+        <h3>Покрытие тестов по категориям</h3>
+        <div class="table-wrap">
+          <table class="data" id="vm-coverage-table">
+            <thead>
+              <tr><th>Категория</th><th>Кейсов</th><th>Что проверяется</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="3" class="quiet">Загрузка категорий…</td></tr>
+            </tbody>
+          </table>
+        </div>
 
         <figure>
           <svg class="scatter" id="vm-scatter" viewBox="0 0 640 300" role="img" aria-label="Токены артефакта против размера VM-модуля"></svg>
