@@ -1,0 +1,120 @@
+{
+  "generatedAt": "2026-11-19T12:33:09.107Z",
+  "task": "calculator in C, 17 shared tests, isolated sandbox without the reference source",
+  "tokenizer": "o200k_base",
+  "runs": [
+    {
+      "model": "deepseek-v4.1-flash-free",
+      "artifactTokens": 1623,
+      "authoringBytes": 4738,
+      "iterations": 1,
+      "failedIterations": 0,
+      "distinctDefects": [],
+      "final": {
+        "note": "initial implementation: full state machine per spec (input buffer, pending op, repeat equals, div-by-zero, back/neg)",
+        "compiled": true,
+        "passed": 17,
+        "total": 17,
+        "failures": [],
+        "error": null,
+        "seq": 1,
+        "time": "2026-11-19T12:26:10.441Z"
+      },
+      "log": [
+        {
+          "note": "initial implementation: full state machine per spec (input buffer, pending op, repeat equals, div-by-zero, back/neg)",
+          "compiled": true,
+          "passed": 17,
+          "total": 17,
+          "failures": [],
+          "error": null,
+          "seq": 1,
+          "time": "2026-11-19T12:26:10.441Z"
+        }
+      ]
+    },
+    {
+      "model": "flint-40b-free",
+      "artifactTokens": 1404,
+      "authoringBytes": 3728,
+      "iterations": 3,
+      "failedIterations": 2,
+      "distinctDefects": [
+        "ошибка компиляции",
+        "исправлены объявления floor/fabs"
+      ],
+      "final": {
+        "note": "исправлено переполнение знака при добавлении цифры к отрицательному вводу",
+        "compiled": true,
+        "passed": 17,
+        "total": 17,
+        "failures": [],
+        "error": null,
+        "seq": 3,
+        "time": "2026-11-19T12:32:20.167Z"
+      },
+      "log": [
+        {
+          "note": "первичная реализация по SPEC",
+          "compiled": false,
+          "passed": 0,
+          "total": 17,
+          "failures": [],
+          "error": "C:\\Users\\user\\AppData\\Local\\Temp\\opencode\\repl-flint\\calc.c:84:15: error: call to undeclared library function 'floor' with type 'double (double)'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]\r\n   84 |       g_cur = floor(g_cur * div) / div;\r\n      |               ^\r\nC:\\Users\\user\\AppData\\Local\\Temp\\opencode\\repl-flint\\calc.c:84:15: note: include the header <math.h> or explicitly provide a declaration for 'floor'\r\nC:\\Users\\user\\AppData\\Local\\Temp\\opencode\\repl-flint\\calc.c:91:22: error: call to undeclared library function 'fabs' with type 'double (double)'; ISO C99 and later do not support implicit function declarations [-Wimplicit-function-declaration]\r\n   91 |   double mag = floor(fabs(g_cur) / 10.0);\r\n      |                      ^\r\nC:\\Users\\user\\AppData\\Local\\Temp\\opencode\\repl-flint\\calc.c:91:22: note: include the header <math.h> or explicitly provide a declaration for 'fabs'\r\n2 errors generated.",
+          "seq": 1,
+          "time": "2026-11-19T12:30:24.173Z"
+        },
+        {
+          "note": "исправлены объявления floor/fabs",
+          "compiled": true,
+          "passed": 16,
+          "total": 17,
+          "failures": [],
+          "error": null,
+          "seq": 2,
+          "time": "2026-11-19T12:30:48.209Z"
+        },
+        {
+          "note": "исправлено переполнение знака при добавлении цифры к отрицательному вводу",
+          "compiled": true,
+          "passed": 17,
+          "total": 17,
+          "failures": [],
+          "error": null,
+          "seq": 3,
+          "time": "2026-11-19T12:32:20.167Z"
+        }
+      ]
+    },
+    {
+      "model": "mimo-v2.6-flash-free",
+      "artifactTokens": 1926,
+      "authoringBytes": 7141,
+      "iterations": 1,
+      "failedIterations": 0,
+      "distinctDefects": [],
+      "final": {
+        "note": "первая реализация: состояние, ввод, операции, повтор «=», деление на ноль",
+        "compiled": true,
+        "passed": 17,
+        "total": 17,
+        "failures": [],
+        "error": null,
+        "seq": 1,
+        "time": "2026-11-19T12:29:20.242Z"
+      },
+      "log": [
+        {
+          "note": "первая реализация: состояние, ввод, операции, повтор «=», деление на ноль",
+          "compiled": true,
+          "passed": 17,
+          "total": 17,
+          "failures": [],
+          "error": null,
+          "seq": 1,
+          "time": "2026-11-19T12:29:20.242Z"
+        }
+      ]
+    }
+  ]
+}

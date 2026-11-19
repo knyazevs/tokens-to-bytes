@@ -65,6 +65,8 @@ function fail(message) {
     '#vm-setup-table tbody': 4,
     '#vm-results-table tbody': 7,
     '#vm-spread-table tbody': 6,
+    '#paired-table tbody': 5,
+    '#replication-table tbody': 6,
   };
   for (const [sel, cols] of Object.entries(tables)) {
     const body = $(sel);
@@ -284,6 +286,29 @@ function renderPaired(selector, sets) {
       <tr>
         <td><b>${names.get(id) ?? id}</b></td>
         ${cells}
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderReplication(selector, data) {
+  const body = $(selector);
+  if (!body) return;
+  if (!data?.runs?.length) {
+    body.innerHTML = '<tr><td colspan="6" class="quiet">Журналы репликации недоступны — нужен локальный сервер.</td></tr>';
+    return;
+  }
+  body.innerHTML = data.runs.map((run) => {
+    const f = run.final ?? {};
+    const tests = `${f.passed ?? 0}/${f.total ?? 17}`;
+    return `
+      <tr>
+        <td><b>${run.model}</b></td>
+        <td>${fmtInt(run.iterations)}</td>
+        <td>${fmtInt(run.failedIterations)}</td>
+        <td>${fmtInt(run.distinctDefects.length)}</td>
+        <td>${fmtInt(run.artifactTokens)}</td>
+        <td class="${f.passed === f.total ? 'strong' : ''}">${tests}</td>
       </tr>
     `;
   }).join('');
@@ -576,6 +601,12 @@ const paired = Object.fromEntries(
     pairedResults[i].status === 'fulfilled' ? pairedResults[i].value : null,
   ]),
 );
+let replication = null;
+try {
+  replication = await loadJson('data/replication.json');
+} catch {
+  replication = null;
+}
 
 const calculator = calculatorResult.status === 'fulfilled' ? calculatorResult.value : null;
 const json = jsonResult.status === 'fulfilled' ? jsonResult.value : null;
@@ -596,6 +627,7 @@ if (calculator) {
     paired.regex,
     paired.vm,
   ]);
+  renderReplication('#replication-table tbody', replication);
   initMetric('#calculator-metric', '#size-chart', calculator);
   initVerify({
     data: calculator,

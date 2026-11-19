@@ -5,7 +5,7 @@
 Research artifact: can a language model write WebAssembly bytecode directly, without a
 high-level language and a compiler? Four projects are measured, each with the same fixed API
 implemented six ways — five languages, with C++ built twice. The article (`index.html`) is in
-Russian with an English abstract, keywords, references and a statements section; version v0.2.
+Russian with an English abstract, keywords, references and a statements section; version v0.3.
 
 ## Calculator
 
@@ -115,6 +115,23 @@ AssemblyScript: the other five builds land within 1.03×. Paired blocks (12) sho
 hand-written module 2.3 % ahead of C++ `-O3` (11/12 wins), with C++ `-Oz` +1.5 % (12/12) and
 C +1.3 % (11/12) also ahead; Rust is 15.2 % behind and AssemblyScript 60.7 %. C++ `-O3` vs
 `-Oz` is −1.5 % speed for +1.1 % bytes.
+
+## Cross-model replication
+
+The artifact-token counts above measure the artifact, not the generation process. A pilot
+experiment now logs the process itself: three models (`deepseek-v4.1-flash-free`,
+`flint-40b-free`, `mimo-v2.6-flash-free`) received the same calculator spec, the same 17-test
+protocol and an isolated sandbox without the reference source. After every edit they ran
+`build-test.mjs`, which appended the iteration, the fix note and the test result to
+`dev-log.json`. `builds/replication.mjs setup|verify|collect` creates the sandbox,
+independently re-checks the result and writes `data/replication.json`.
+
+In this pilot, all three final implementations independently passed 17/17. DeepSeek and Mimo
+finished in 1 iteration with 0 failed iterations and 0 documented defects (1 623 and 1 926
+artifact tokens, o200k_base). Flint required 3 iterations and 2 failures — a compile error
+(implicit `floor`/`fabs` declarations) and a test failure after that fix — before reaching
+17/17 (1 404 tokens). These numbers are a lower bound on the generation process: the ledger
+records only what went through the helper, not every mistake a model may have made.
 
 The article lives at the repository root: [`index.html`](index.html).
 Live version: <https://knyazevs.github.io/tokens-to-bytes/>.
