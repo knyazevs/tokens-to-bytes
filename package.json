@@ -10,6 +10,7 @@
     "measure": "node builds/measure.mjs",
     "paired": "node builds/paired.mjs",
     "bench:one": "node builds/bench-one.mjs",
+    "bench:native": "node native/run.mjs",
     "build:cpp": "node builds/build-cpp.mjs",
     "build:manual": "node builds/build-manual.mjs",
     "build:json": "node builds/build.mjs json",
