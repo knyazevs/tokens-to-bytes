@@ -68,6 +68,8 @@
         <span class="sep">·</span>
         <span>независимое исследование</span>
         <span class="sep">·</span>
+        <a href="TRAJECTORY.md">Траектория исследования</a>
+        <span class="sep">·</span>
         <a href="#cite">BibTeX</a>
         <span class="sep">·</span>
         <span>MIT</span>
@@ -1081,7 +1083,8 @@ npm run build:vm            # шесть сборок стековой VM
 node builds/paired.mjs calculator 20
 node builds/paired.mjs json 12
 node builds/paired.mjs regex 12
-node builds/paired.mjs vm 12</code></pre>
+node builds/paired.mjs vm 12
+node native/run.mjs               # 3 нативные дуэли: Sort4, Types, VM Direct-Threading & Macro-ASM</code></pre>
 
         <p>Замер на гибридном процессоре стоит привязывать к P-ядрам, иначе Windows может перенести процесс на E-ядра посреди прогона: <code>AFFINITY=FFF</code> в окружении и <code>start /affinity FFF</code> для запуска. Привязка попадёт в файл измерений проекта вместе с методом.</p>
 
@@ -1089,6 +1092,8 @@ node builds/paired.mjs vm 12</code></pre>
 
         <pre class="tree"><code>tokens-to-bytes/
 ├─ index.html                 статья
+├─ TRAJECTORY.md              траектория исследования и эпистемический журнал
+├─ native/                    нативные x86-64 дуэли и Macro-ASM ядра
 ├─ assets/                    стили, скрипты, общие протоколы
 ├─ data/
 │  ├─ projects.json           реестр проектов

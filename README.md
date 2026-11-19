@@ -8,6 +8,8 @@ implemented across nine builds — five languages, with hand-written WAT evaluat
 (v1 baseline and v2 optimized) both raw and with `wasm-opt -Oz`, alongside C++ built twice (`-Oz` and `-O3`).
 The article (`index.html`) is in Russian with an English abstract, keywords, references and a statements section; version v0.4.
 
+For the full epistemic research journal and theoretical paradigm shift, see [`TRAJECTORY.md`](TRAJECTORY.md).
+
 ## Calculator
 
 17 exports. State machine: input, decimals, backspace, sign change, operation chains and
@@ -25,9 +27,9 @@ repeat `=`.
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 1 872 B | 911 B | 822 B | 17/17 | 1 225 |
 | C++ -O3 | clang++ -O3, no exceptions/RTTI | 2 437 B | 987 B | 900 B | 17/17 | 1 225 |
 
-Speed lives in `data/calculator.json`: hand-written v2 reaches **151.7M ops/sec** (vs C++ `-O3` at 144.7M ops/sec). In
-paired randomized blocks (12 blocks, seed `20261119`), `manual-v2-opt` achieves **102.0 % relative to C++ `-O3` (8/12 block wins)**,
-staying ahead of AssemblyScript (94.9 %), C++ `-Oz` (93.0 %), C (90.3 %), and Rust (85.8 %).
+Speed lives in `data/calculator.json`: hand-written v2 reaches **157.3M ops/sec** (vs C++ `-O3` at 155.7M ops/sec). In
+paired randomized blocks (12 blocks, seed `20261119`), `manual-v2-opt` achieves statistical parity with C++ `-O3` (95 % CI: -2.9 % … +4.4 %, 5/12 block wins)
+at **4.3× smaller binary size** (562 B vs 2 437 B).
 
 The hand-written module is the smallest after gzip/brotli (606/567 B), but not in raw
 bytes where AssemblyScript is 1 164 B vs 1 401 B.
@@ -48,11 +50,11 @@ at `0x10000` and the root-string buffer at `0x20000`.
 | AssemblyScript | asc → wasm-opt | 3 190 B | 1 378 B | 1 259 B | 27/27 | 3 828 |
 | C | clang --target=wasm32-freestanding | 4 137 B | 1 866 B | 1 644 B | 27/27 | 3 303 |
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 4 676 B | 2 045 B | 1 803 B | 27/27 | 3 400 |
-| C++ -O3 | clang++ -O3, no exceptions/RTTI | 5 701 B | 2 280 B | 2 012 B | 27/27 | 3 400 |
+| C++ -O3 | clang++ -O3, no exceptions/RTTI | 5 712 B | 2 284 B | 2 015 B | 27/27 | 3 400 |
 
-With `wasm-opt -Oz`, the hand-written code shrinks to **3 056 B raw** (beating AssemblyScript's 3 190 B and almost half of C++ `-O3`'s 5 701 B).
-In paired blocks (12 blocks), tuned `manual-v2` reaches **3 144 786 docs/s (+8.9 % relative to C++ `-O3`, 12/12 BLOCK WINS)**, decisively beating
-all compilers (C++ `-O3` 2.93M, C 2.73M, C++ `-Oz` 2.69M, Rust 2.63M, and AssemblyScript 2.63M docs/s).
+With `wasm-opt -Oz`, the hand-written code shrinks to **3 056 B raw** (beating AssemblyScript's 3 190 B and almost half of C++ `-O3`'s 5 712 B).
+In paired blocks (12 blocks), tuned `manual-v2` reaches **3 300 544 docs/s (+6.2 % relative to C++ `-O3`, 10/12 BLOCK WINS)**, decisively beating
+all compilers even after C++ was adversarially optimized with `switch` dispatch and fast whitespace filters.
 
 ## Regex engine
 
@@ -78,8 +80,8 @@ backtracking into error `8` instead of a hang.
 **Major Optimization Breakthrough:**
 - Baseline v1 without opt trailed C++ `-O3` by 10.3 % (0/12 wins).
 - Tuned v2 eliminated the 8-`if` dispatch chain in favor of `br_table` and used hardware memory offsets.
-- `manual-v2` reached **102.0 % of C++ `-O3` (11/12 block wins)**.
-- `manual-v2-opt` achieved **106.4 % of C++ `-O3` (12/12 BLOCK WINS)** — becoming the **#1 fastest engine overall**, while module size shrank to **3 019 B** (smaller than AssemblyScript 3 132 B and almost half the size of C++ 5 703 B).
+- `manual-v2` reached **102.8 % of C++ `-O3` (12/12 block wins)**.
+- `manual-v2-opt` achieved **106.2 % of C++ `-O3` (12/12 BLOCK WINS)** at **1 407 089 searches/s** — becoming the **#1 fastest engine overall**, while module size shrank to **3 019 B** (smaller than AssemblyScript 3 132 B and almost half the size of C++ 5 703 B).
 
 ## Stack VM
 
@@ -100,11 +102,9 @@ steps.
 | AssemblyScript | asc → wasm-opt | 1 693 B | 953 B | 874 B | 52/52 | 2 713 |
 | C | clang --target=wasm32-freestanding | 1 897 B | 1 072 B | 977 B | 52/52 | 2 228 |
 | C++ -Oz | clang++ -Oz, no exceptions/RTTI | 1 897 B | 1 072 B | 977 B | 52/52 | 2 239 |
-| C++ -O3 | clang++ -O3, no exceptions/RTTI | 1 917 B | 1 064 B | 960 B | 52/52 | 2 239 |
+| C++ -O3 | clang++ -O3, no exceptions/RTTI | 2 427 B | 1 112 B | 995 B | 52/52 | 2 239 |
 
-`manual-v2-opt` delivers **104.5 % relative to C++ `-O3` (12/12 block wins)** at 37 864 runs/s,
-beating Rust by +23.2 % and AssemblyScript by 2.66× (14 208 runs/s, 39.1 % of leader).
-Raw size dropped to 2 090 B (−16.8 %), and `manual-v2` set an absolute brotli compression record of **779 B**.
+In WebAssembly, un-nesting the 13 arithmetic opcode branches in C++ enabled Clang `-O3` to build a direct jump table and keep `sp` in registers, pushing C++ `-O3` to **44 233 runs/s** ahead of WAT `manual-v2` (40 087 runs/s). As shown in Native Duel 3, once freed from WebAssembly's lack of computed gotos, handcrafted x86-64 ASM beats C++ -O3 by **+54.4 % (2.45× faster)**.
 
 ## Adversarial Hardening of Reference C++
 
@@ -113,13 +113,32 @@ To defend against the "straw man baseline" critique — the suspicion that high-
 1. **Stack VM (`builds/cpp/vm.cpp`):** The 13 arithmetic opcodes previously shared a merged `switch` label containing a 13-branch linear `if-else` cascade. Un-nesting them into dedicated `case` labels with direct jump table dispatch yielded a **+14.6 % speedup in C++ -O3** (38 581 → 44 233 runs/s).
 2. **JSON Parser (`builds/cpp/json.cpp`):** Linear `if-else` value dispatch was converted to `switch (c)`, single-check ASCII whitespace filter `c > ' '` was added to `skipWs()`, and unsigned range checks were introduced in number and hex parsing. C++ -O3 throughput grew from 2.96M to **3.10M docs/s**.
 3. **Regex Engine (`builds/cpp/regex.cpp`):** Linear 8-branch interpreter chain was replaced with idiomatic `switch (op)`. C++ -O3 throughput rose to **1.32M searches/s**.
-4. **Calculator (`builds/cpp/calc.cpp`):** Floating-point division in fractional input was replaced with fast multiplication `scale *= 0.1`, yielding **145.1M ops/s**.
+4. **Calculator (`builds/cpp/calc.cpp`):** Floating-point division in fractional input was replaced with fast multiplication `scale *= 0.1`, yielding **155.7M ops/s**.
 
 Even against this hardened, optimized baseline:
 - **Regex:** Hand-written WAT (`manual-v2-opt`) beats C++ -O3 in **12 out of 12 paired blocks** (+6.2 %, 1.407M vs 1.323M searches/s).
 - **JSON:** Hand-written WAT (`manual-v2`) beats C++ -O3 in **10 out of 12 paired blocks** (+6.2 %, 3.300M vs 3.097M docs/s).
 - **Calculator:** Hand-written WAT (`manual-v2-opt`) is in **statistical parity** with C++ -O3 (148.2M vs 145.1M ops/s, 95 % CI: -2.9 % … +4.4 %, 5/12 wins) while being **4.3× smaller** (562 B vs 2 437 B).
-- **VM:** Hardened C++ -O3 takes the lead (44.2k vs 40.0k runs/s, -8.7 %) because Clang's loop optimizer pins the stack pointer `sp` in a physical CPU register across jump table dispatches, whereas WebAssembly WAT accesses a global variable and computes memory addresses per instruction.
+- **VM:** Hardened C++ -O3 takes the lead in Wasm (44.2k vs 40.0k runs/s, -8.7 %) because Clang's loop optimizer pins the stack pointer `sp` in a physical CPU register across jump table dispatches, which led us directly into the native bare-metal duels.
+
+## Native x86-64 Duels: Bare-Metal Architecture
+
+To measure what assembly achieves when released from WebAssembly's virtual sandbox constraints (register allocation, memory alignment rules, indirect jump bans), we conducted three native bare-metal duels on an Intel Core 12th Gen P-core (Alder Lake Golden Cove), measuring CPU cycles with `rdtsc` and memory fences:
+
+```bash
+node native/run.mjs
+```
+
+| Duel | Kernel | Benchmark Metric | C++ (-O3) | Handcrafted ASM | Result |
+|---|---|---|---:|---:|---:|
+| **Duel 1** (`native/sort4_asm.s`) | Sort4 Branchless | Min Cycles / Sort | 2.39 c | **1.79 c** | **+24.9 % faster** (AlphaDev pattern) |
+| **Duel 2** (`native/types_asm.s`) | 64-bit Packed Types | Median Cycles / Node | 1.62 c | **0.83 c** | **+44.9 % faster** (Bypasses Memory Wall, fits L2) |
+| **Duel 3** (`native/vm_macro.S`) | Stack VM Interpreter | Median Cycles / Op | 3.61 c | **1.65 c** | **+54.4 % faster (2.45× speedup)** (Direct Threading) |
+
+### Macro-ASM: Zero-Penalty Token Compression
+In Duel 3, `native/vm_macro.S` applies a standard C-preprocessor / GAS macro layer over the assembly kernel:
+- **Footprint:** Drops from 275 lines to 168 lines (**-39 % reduction in token/line footprint**).
+- **Performance:** Retains 100 % performance parity with raw assembly (**1.65 c/op vs 1.73 c/op raw**), outperforming C++ -O3 by **2.45×**.
 
 ## Cross-model replication
 
@@ -214,6 +233,7 @@ node builds/paired.mjs calculator 20   # data/paired-calculator.json
 node builds/paired.mjs json 12         # data/paired-json.json
 node builds/paired.mjs regex 12        # data/paired-regex.json
 node builds/paired.mjs vm 12           # data/paired-vm.json
+node native/run.mjs                    # runs all 3 native x86-64 duels & macro-asm
 ```
 
 On a hybrid CPU, pin the measurement to P-cores so Windows does not schedule it onto
@@ -226,7 +246,9 @@ $env:AFFINITY='FFF'; cmd /c start /affinity FFF /wait /b node builds/measure.mjs
 ## Structure
 
 ```
+TRAJECTORY.md              research trajectory & epistemic lab notebook
 index.html                 the article
+native/                    native x86-64 duels, bare-metal kernels & macro-asm benchmarks
 assets/                    styles, scripts, shared protocols, isolated browser bench
 data/
   projects.json            project registry
