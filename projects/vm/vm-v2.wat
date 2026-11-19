@@ -30,15 +30,6 @@
 
   ;; ── служебные ────────────────────────────────────────────────
 
-  (func $push (param $v i32) (result i32)
-    (if (i32.ge_s (global.get $sp) (i32.const 1024))
-      (then (return (i32.const 3))))
-    (i32.store
-      (i32.add (i32.const 17408) (i32.shl (global.get $sp) (i32.const 2)))
-      (local.get $v))
-    (global.set $sp (i32.add (global.get $sp) (i32.const 1)))
-    (i32.const 0))
-
   ;; Фиксирует глубину и вершину стека, возвращает 0/-1.
   (func $stop (result i32)
     (global.set $depth (global.get $sp))
@@ -47,7 +38,7 @@
         (then
           (i32.load
             (i32.add (i32.const 17408)
-              (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4)))))
+              (i32.shl (i32.sub (global.get $sp) (i32.const 1)) (i32.const 2)))))
         (else (i32.const 0))))
     (if (result i32) (i32.eqz (global.get $err))
       (then (i32.const 0))
@@ -58,6 +49,20 @@
     (global.set $err (local.get $code))
     (global.set $pc (i32.sub (global.get $pc) (i32.const 1)))
     (call $stop))
+
+  (func $sync_stop (param $p i32) (param $s i32) (param $f i32) (param $st i32) (result i32)
+    (global.set $pc (local.get $p))
+    (global.set $sp (local.get $s))
+    (global.set $fp (local.get $f))
+    (global.set $steps (local.get $st))
+    (call $stop))
+
+  (func $sync_die (param $p i32) (param $s i32) (param $f i32) (param $st i32) (param $code i32) (result i32)
+    (global.set $pc (local.get $p))
+    (global.set $sp (local.get $s))
+    (global.set $fp (local.get $f))
+    (global.set $steps (local.get $st))
+    (call $die (local.get $code)))
 
   ;; ── API ──────────────────────────────────────────────────────
 
@@ -85,7 +90,7 @@
       (loop $next
         (br_if $done (i32.ge_s (local.get $i) (local.get $count)))
         (local.set $base
-          (i32.add (i32.const 1024) (i32.mul (local.get $i) (i32.const 4))))
+          (i32.add (i32.const 1024) (i32.shl (local.get $i) (i32.const 2))))
         (local.set $op (i32.load8_u (local.get $base)))
 
         ;; неизвестный опкод
@@ -137,16 +142,27 @@
     (local $base i32)
     (local $a i32)
     (local $b i32)
-    (local $t i32)
     (local $i i32)
+    (local $pc i32)
+    (local $sp i32)
+    (local $fp i32)
+    (local $steps i32)
+    (local $limit i32)
+    (local $code_len i32)
 
     (if (i32.eqz (global.get $loaded))
       (then (global.set $err (i32.const 9)) (return (i32.const -1))))
 
-    (global.set $limit
+    (local.set $limit
       (if (result i32) (i32.le_s (local.get $cap) (i32.const 0))
         (then (i32.const 1000000))
         (else (local.get $cap))))
+
+    (local.set $sp (i32.const 0))
+    (local.set $fp (i32.const 0))
+    (local.set $pc (i32.const 0))
+    (local.set $steps (i32.const 0))
+    (local.set $code_len (global.get $code_len))
 
     (global.set $sp (i32.const 0))
     (global.set $fp (i32.const 0))
@@ -163,25 +179,29 @@
         (br_if $zl_done (i32.ge_s (local.get $i) (i32.const 8)))
         (i32.store
           (i32.add (i32.const 21504)
-            (i32.mul (i32.add (local.get $i) (i32.const 1)) (i32.const 4)))
+            (i32.shl (i32.add (local.get $i) (i32.const 1)) (i32.const 2)))
           (i32.const 0))
         (local.set $i (i32.add (local.get $i) (i32.const 1)))
         (br $zl)))
 
     (loop $loop
       ;; лимит шагов
-      (if (i32.ge_s (global.get $steps) (global.get $limit))
-        (then (global.set $err (i32.const 7)) (return (call $stop))))
+      (if (i32.ge_s (local.get $steps) (local.get $limit))
+        (then
+          (global.set $err (i32.const 7))
+          (return (call $sync_stop (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps)))))
 
       ;; pc за границей программы
-      (if (i32.ge_u (global.get $pc) (global.get $code_len))
-        (then (global.set $err (i32.const 6)) (return (call $stop))))
+      (if (i32.ge_u (local.get $pc) (local.get $code_len))
+        (then
+          (global.set $err (i32.const 6))
+          (return (call $sync_stop (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps)))))
 
       (local.set $base
-        (i32.add (i32.const 1024) (i32.shl (global.get $pc) (i32.const 2))))
+        (i32.add (i32.const 1024) (i32.shl (local.get $pc) (i32.const 2))))
       (local.set $op (i32.load8_u (local.get $base)))
       (local.set $x (i32.load8_u offset=1 (local.get $base)))
-      (global.set $pc (i32.add (global.get $pc) (i32.const 1)))
+      (local.set $pc (i32.add (local.get $pc) (i32.const 1)))
 
       (block $continue
         (block $case27
@@ -221,376 +241,327 @@
                                                                 (i32.sub (local.get $op) (i32.const 1)))
                                                             )
                                                             ;; 1 · PUSH imm
+                                                            (if (i32.ge_s (local.get $sp) (i32.const 1024))
+                                                              (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 3)))))
                                                             (local.set $a
                                                               (i32.or
                                                                 (i32.or
-                                                                  (i32.shl (i32.load8_u offset=1 (local.get $base)) (i32.const 16))
+                                                                  (i32.shl (local.get $x) (i32.const 16))
                                                                   (i32.shl (i32.load8_u offset=2 (local.get $base)) (i32.const 8)))
                                                                 (i32.load8_u offset=3 (local.get $base))))
                                                             (local.set $a (i32.shr_s (i32.shl (local.get $a) (i32.const 8)) (i32.const 8)))
-                                                            (local.set $t (call $push (local.get $a)))
-                                                            (if (local.get $t) (then (return (call $die (local.get $t)))))
+                                                            (i32.store
+                                                              (i32.add (i32.const 17408) (i32.shl (local.get $sp) (i32.const 2)))
+                                                              (local.get $a))
+                                                            (local.set $sp (i32.add (local.get $sp) (i32.const 1)))
                                                             (br $continue)
                                                           )
                                                           ;; 2 · POP
-                                                          (if (i32.lt_s (global.get $sp) (i32.const 1))
-                                                            (then (return (call $die (i32.const 2)))))
-                                                          (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                                          (if (i32.lt_s (local.get $sp) (i32.const 1))
+                                                            (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                                          (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                                           (br $continue)
                                                         )
                                                         ;; 3 · DUP
-                                                        (if (i32.lt_s (global.get $sp) (i32.const 1))
-                                                          (then (return (call $die (i32.const 2)))))
-                                                        (local.set $t (call $push
+                                                        (if (i32.lt_s (local.get $sp) (i32.const 1))
+                                                          (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                                        (if (i32.ge_s (local.get $sp) (i32.const 1024))
+                                                          (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 3)))))
+                                                        (i32.store
+                                                          (i32.add (i32.const 17408) (i32.shl (local.get $sp) (i32.const 2)))
                                                           (i32.load
-                                                            (i32.add (i32.const 17408)
-                                                              (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))))
-                                                        (if (local.get $t) (then (return (call $die (local.get $t)))))
+                                                            (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2)))))
+                                                        (local.set $sp (i32.add (local.get $sp) (i32.const 1)))
                                                         (br $continue)
                                                       )
                                                       ;; 4 · SWAP
-                                                      (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                                        (then (return (call $die (i32.const 2)))))
+                                                      (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                                        (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
                                                       (local.set $base
-                                                        (i32.add (i32.const 17408)
-                                                          (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
+                                                        (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 2)) (i32.const 2))))
                                                       (local.set $a (i32.load (local.get $base)))
-                                                      (local.set $b (i32.load (i32.sub (local.get $base) (i32.const 4))))
+                                                      (local.set $b (i32.load offset=4 (local.get $base)))
                                                       (i32.store (local.get $base) (local.get $b))
-                                                      (i32.store (i32.sub (local.get $base) (i32.const 4)) (local.get $a))
+                                                      (i32.store offset=4 (local.get $base) (local.get $a))
                                                       (br $continue)
                                                     )
                                                     ;; 5 · ADD
-                                                    (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                                      (then (return (call $die (i32.const 2)))))
+                                                    (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                                      (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                                    (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                                     (local.set $base
-                                                      (i32.add (i32.const 17408)
-                                                        (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                                    (local.set $b (i32.load (local.get $base)))
-                                                    (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                                    (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                                      (i32.add (local.get $a) (local.get $b)))
-                                                    (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                                      (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                                    (i32.store (local.get $base)
+                                                      (i32.add (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                                     (br $continue)
                                                   )
                                                   ;; 6 · SUB
-                                                  (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                                    (then (return (call $die (i32.const 2)))))
+                                                  (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                                    (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                                  (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                                   (local.set $base
-                                                    (i32.add (i32.const 17408)
-                                                      (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                                  (local.set $b (i32.load (local.get $base)))
-                                                  (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                                  (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                                    (i32.sub (local.get $a) (local.get $b)))
-                                                  (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                                    (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                                  (i32.store (local.get $base)
+                                                    (i32.sub (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                                   (br $continue)
                                                 )
                                                 ;; 7 · MUL
-                                                (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                                  (then (return (call $die (i32.const 2)))))
+                                                (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                                  (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                                (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                                 (local.set $base
-                                                  (i32.add (i32.const 17408)
-                                                    (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                                (local.set $b (i32.load (local.get $base)))
-                                                (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                                (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                                  (i32.mul (local.get $a) (local.get $b)))
-                                                (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                                  (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                                (i32.store (local.get $base)
+                                                  (i32.mul (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                                 (br $continue)
                                               )
                                               ;; 8 · DIV
-                                              (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                                (then (return (call $die (i32.const 2)))))
+                                              (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                                (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
                                               (local.set $base
-                                                (i32.add (i32.const 17408)
-                                                  (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                              (local.set $b (i32.load (local.get $base)))
-                                              (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                              ;; операнды снимаются до проверки: при ошибке
-                                              ;; глубина совпадает с C-референсом
-                                              (global.set $sp (i32.sub (global.get $sp) (i32.const 2)))
+                                                (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 2)) (i32.const 2))))
+                                              (local.set $a (i32.load (local.get $base)))
+                                              (local.set $b (i32.load offset=4 (local.get $base)))
+                                              (local.set $sp (i32.sub (local.get $sp) (i32.const 2)))
                                               (if (i32.eqz (local.get $b))
-                                                (then (return (call $die (i32.const 5)))))
-                                              (local.set $t
+                                                (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 5)))))
+                                              (i32.store (local.get $base)
                                                 (if (result i32)
                                                   (i32.and
                                                     (i32.eq (local.get $a) (i32.const -2147483648))
                                                     (i32.eq (local.get $b) (i32.const -1)))
                                                   (then (local.get $a))
                                                   (else (i32.div_s (local.get $a) (local.get $b)))))
-                                              (i32.store
-                                                (i32.add (i32.const 17408)
-                                                  (i32.shl (global.get $sp) (i32.const 2)))
-                                                (local.get $t))
-                                              (global.set $sp (i32.add (global.get $sp) (i32.const 1)))
+                                              (local.set $sp (i32.add (local.get $sp) (i32.const 1)))
                                               (br $continue)
                                             )
                                             ;; 9 · MOD
-                                            (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                              (then (return (call $die (i32.const 2)))))
+                                            (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                              (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
                                             (local.set $base
-                                              (i32.add (i32.const 17408)
-                                                (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                            (local.set $b (i32.load (local.get $base)))
-                                            (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                            (global.set $sp (i32.sub (global.get $sp) (i32.const 2)))
+                                              (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 2)) (i32.const 2))))
+                                            (local.set $a (i32.load (local.get $base)))
+                                            (local.set $b (i32.load offset=4 (local.get $base)))
+                                            (local.set $sp (i32.sub (local.get $sp) (i32.const 2)))
                                             (if (i32.eqz (local.get $b))
-                                              (then (return (call $die (i32.const 5)))))
-                                            (i32.store
-                                              (i32.add (i32.const 17408)
-                                                (i32.shl (global.get $sp) (i32.const 2)))
+                                              (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 5)))))
+                                            (i32.store (local.get $base)
                                               (i32.rem_s (local.get $a) (local.get $b)))
-                                            (global.set $sp (i32.add (global.get $sp) (i32.const 1)))
+                                            (local.set $sp (i32.add (local.get $sp) (i32.const 1)))
                                             (br $continue)
                                           )
                                           ;; 10 · NEG
-                                          (if (i32.lt_s (global.get $sp) (i32.const 1))
-                                            (then (return (call $die (i32.const 2)))))
+                                          (if (i32.lt_s (local.get $sp) (i32.const 1))
+                                            (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
                                           (local.set $base
-                                            (i32.add (i32.const 17408)
-                                              (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
+                                            (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
                                           (i32.store (local.get $base)
                                             (i32.sub (i32.const 0) (i32.load (local.get $base))))
                                           (br $continue)
                                         )
                                         ;; 11 · EQ
-                                        (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                          (then (return (call $die (i32.const 2)))))
+                                        (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                          (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                        (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                         (local.set $base
-                                          (i32.add (i32.const 17408)
-                                            (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                        (local.set $b (i32.load (local.get $base)))
-                                        (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                        (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                          (i32.eq (local.get $a) (local.get $b)))
-                                        (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                          (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                        (i32.store (local.get $base)
+                                          (i32.eq (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                         (br $continue)
                                       )
                                       ;; 12 · NE
-                                      (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                        (then (return (call $die (i32.const 2)))))
+                                      (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                        (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                      (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                       (local.set $base
-                                        (i32.add (i32.const 17408)
-                                          (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                      (local.set $b (i32.load (local.get $base)))
-                                      (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                      (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                        (i32.ne (local.get $a) (local.get $b)))
-                                      (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                        (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                      (i32.store (local.get $base)
+                                        (i32.ne (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                       (br $continue)
                                     )
                                     ;; 13 · LT
-                                    (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                      (then (return (call $die (i32.const 2)))))
+                                    (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                      (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                    (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                     (local.set $base
-                                      (i32.add (i32.const 17408)
-                                        (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                    (local.set $b (i32.load (local.get $base)))
-                                    (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                    (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                      (i32.lt_s (local.get $a) (local.get $b)))
-                                    (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                      (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                    (i32.store (local.get $base)
+                                      (i32.lt_s (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                     (br $continue)
                                   )
                                   ;; 14 · LE
-                                  (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                    (then (return (call $die (i32.const 2)))))
+                                  (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                    (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                  (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                   (local.set $base
-                                    (i32.add (i32.const 17408)
-                                      (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                  (local.set $b (i32.load (local.get $base)))
-                                  (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                  (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                    (i32.le_s (local.get $a) (local.get $b)))
-                                  (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                    (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                  (i32.store (local.get $base)
+                                    (i32.le_s (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                   (br $continue)
                                 )
                                 ;; 15 · GT
-                                (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                  (then (return (call $die (i32.const 2)))))
+                                (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                  (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                                (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                                 (local.set $base
-                                  (i32.add (i32.const 17408)
-                                    (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                                (local.set $b (i32.load (local.get $base)))
-                                (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                                (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                  (i32.gt_s (local.get $a) (local.get $b)))
-                                (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                  (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                                (i32.store (local.get $base)
+                                  (i32.gt_s (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                                 (br $continue)
                               )
                               ;; 16 · GE
-                              (if (i32.lt_s (global.get $sp) (i32.const 2))
-                                (then (return (call $die (i32.const 2)))))
+                              (if (i32.lt_s (local.get $sp) (i32.const 2))
+                                (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                              (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                               (local.set $base
-                                (i32.add (i32.const 17408)
-                                  (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                              (local.set $b (i32.load (local.get $base)))
-                              (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                              (i32.store (i32.sub (local.get $base) (i32.const 4))
-                                (i32.ge_s (local.get $a) (local.get $b)))
-                              (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                                (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                              (i32.store (local.get $base)
+                                (i32.ge_s (i32.load (local.get $base)) (i32.load offset=4 (local.get $base))))
                               (br $continue)
                             )
                             ;; 17 · AND
-                            (if (i32.lt_s (global.get $sp) (i32.const 2))
-                              (then (return (call $die (i32.const 2)))))
+                            (if (i32.lt_s (local.get $sp) (i32.const 2))
+                              (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                            (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                             (local.set $base
-                              (i32.add (i32.const 17408)
-                                (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                            (local.set $b (i32.load (local.get $base)))
-                            (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                            (i32.store (i32.sub (local.get $base) (i32.const 4))
-                              (i32.and (i32.ne (local.get $a) (i32.const 0))
-                                       (i32.ne (local.get $b) (i32.const 0))))
-                            (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                              (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                            (i32.store (local.get $base)
+                              (i32.and (i32.ne (i32.load (local.get $base)) (i32.const 0))
+                                       (i32.ne (i32.load offset=4 (local.get $base)) (i32.const 0))))
                             (br $continue)
                           )
                           ;; 18 · OR
-                          (if (i32.lt_s (global.get $sp) (i32.const 2))
-                            (then (return (call $die (i32.const 2)))))
+                          (if (i32.lt_s (local.get $sp) (i32.const 2))
+                            (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                          (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
                           (local.set $base
-                            (i32.add (i32.const 17408)
-                              (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
-                          (local.set $b (i32.load (local.get $base)))
-                          (local.set $a (i32.load (i32.sub (local.get $base) (i32.const 4))))
-                          (i32.store (i32.sub (local.get $base) (i32.const 4))
-                            (i32.or (i32.ne (local.get $a) (i32.const 0))
-                                    (i32.ne (local.get $b) (i32.const 0))))
-                          (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
+                            (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
+                          (i32.store (local.get $base)
+                            (i32.or (i32.ne (i32.load (local.get $base)) (i32.const 0))
+                                    (i32.ne (i32.load offset=4 (local.get $base)) (i32.const 0))))
                           (br $continue)
                         )
                         ;; 19 · NOT
-                        (if (i32.lt_s (global.get $sp) (i32.const 1))
-                          (then (return (call $die (i32.const 2)))))
+                        (if (i32.lt_s (local.get $sp) (i32.const 1))
+                          (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
                         (local.set $base
-                          (i32.add (i32.const 17408)
-                            (i32.mul (i32.sub (global.get $sp) (i32.const 1)) (i32.const 4))))
+                          (i32.add (i32.const 17408) (i32.shl (i32.sub (local.get $sp) (i32.const 1)) (i32.const 2))))
                         (i32.store (local.get $base)
                           (i32.eqz (i32.load (local.get $base))))
                         (br $continue)
                       )
                       ;; 20 · JMP
-                      (global.set $pc
+                      (local.set $pc
                         (i32.or
-                          (i32.load8_u offset=1 (local.get $base))
+                          (local.get $x)
                           (i32.shl (i32.load8_u offset=2 (local.get $base))
                                    (i32.const 8))))
                       (br $continue)
                     )
                     ;; 21 · JZ
-                    (if (i32.lt_s (global.get $sp) (i32.const 1))
-                      (then (return (call $die (i32.const 2)))))
-                    (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
-                    (local.set $a
-                      (i32.load
-                        (i32.add (i32.const 17408)
-                          (i32.shl (global.get $sp) (i32.const 2)))))
-                    (if (i32.eqz (local.get $a))
+                    (if (i32.lt_s (local.get $sp) (i32.const 1))
+                      (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                    (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
+                    (if (i32.eqz (i32.load (i32.add (i32.const 17408) (i32.shl (local.get $sp) (i32.const 2)))))
                       (then
-                        (global.set $pc
+                        (local.set $pc
                           (i32.or
-                            (i32.load8_u offset=1 (local.get $base))
+                            (local.get $x)
                             (i32.shl (i32.load8_u offset=2 (local.get $base))
                                      (i32.const 8))))))
                     (br $continue)
                   )
                   ;; 22 · JNZ
-                  (if (i32.lt_s (global.get $sp) (i32.const 1))
-                    (then (return (call $die (i32.const 2)))))
-                  (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
-                  (local.set $a
-                    (i32.load
-                      (i32.add (i32.const 17408)
-                        (i32.shl (global.get $sp) (i32.const 2)))))
-                  (if (local.get $a)
+                  (if (i32.lt_s (local.get $sp) (i32.const 1))
+                    (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+                  (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
+                  (if (i32.ne (i32.load (i32.add (i32.const 17408) (i32.shl (local.get $sp) (i32.const 2)))) (i32.const 0))
                     (then
-                      (global.set $pc
+                      (local.set $pc
                         (i32.or
-                          (i32.load8_u offset=1 (local.get $base))
+                          (local.get $x)
                           (i32.shl (i32.load8_u offset=2 (local.get $base))
                                    (i32.const 8))))))
                   (br $continue)
                 )
                 ;; 23 · LOADL
-                (local.set $t
-                  (call $push
-                    (i32.load
-                      (i32.add (i32.const 21504)
-                        (i32.mul
-                          (i32.add
-                            (i32.mul (global.get $fp) (i32.const 9))
-                            (i32.add (local.get $x) (i32.const 1)))
-                          (i32.const 4))))))
-                (if (local.get $t) (then (return (call $die (local.get $t)))))
+                (if (i32.ge_s (local.get $sp) (i32.const 1024))
+                  (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 3)))))
+                (i32.store
+                  (i32.add (i32.const 17408) (i32.shl (local.get $sp) (i32.const 2)))
+                  (i32.load
+                    (i32.add (i32.const 21504)
+                      (i32.shl
+                        (i32.add
+                          (i32.mul (local.get $fp) (i32.const 9))
+                          (i32.add (local.get $x) (i32.const 1)))
+                        (i32.const 2)))))
+                (local.set $sp (i32.add (local.get $sp) (i32.const 1)))
                 (br $continue)
               )
               ;; 24 · STOREL
-              (if (i32.lt_s (global.get $sp) (i32.const 1))
-                (then (return (call $die (i32.const 2)))))
-              (global.set $sp (i32.sub (global.get $sp) (i32.const 1)))
-              (local.set $a
-                (i32.load
-                  (i32.add (i32.const 17408)
-                    (i32.shl (global.get $sp) (i32.const 2)))))
+              (if (i32.lt_s (local.get $sp) (i32.const 1))
+                (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 2)))))
+              (local.set $sp (i32.sub (local.get $sp) (i32.const 1)))
               (i32.store
                 (i32.add (i32.const 21504)
-                  (i32.mul
+                  (i32.shl
                     (i32.add
-                      (i32.mul (global.get $fp) (i32.const 9))
+                      (i32.mul (local.get $fp) (i32.const 9))
                       (i32.add (local.get $x) (i32.const 1)))
-                    (i32.const 4)))
-                (local.get $a))
+                    (i32.const 2)))
+                (i32.load
+                  (i32.add (i32.const 17408) (i32.shl (local.get $sp) (i32.const 2)))))
               (br $continue)
             )
             ;; 25 · CALL
-            (if (i32.ge_s (i32.add (global.get $fp) (i32.const 1)) (i32.const 128))
-              (then (return (call $die (i32.const 4)))))
-            (global.set $fp (i32.add (global.get $fp) (i32.const 1)))
+            (if (i32.ge_s (i32.add (local.get $fp) (i32.const 1)) (i32.const 128))
+              (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 4)))))
+            (local.set $fp (i32.add (local.get $fp) (i32.const 1)))
             (i32.store
               (i32.add (i32.const 21504)
-                (i32.mul (global.get $fp) (i32.const 36)))
-              (global.get $pc))
+                (i32.mul (local.get $fp) (i32.const 36)))
+              (local.get $pc))
             (local.set $i (i32.const 0))
             (block $call_done
               (loop $call_zero
                 (br_if $call_done (i32.ge_s (local.get $i) (i32.const 8)))
                 (i32.store
                   (i32.add (i32.const 21504)
-                    (i32.mul
+                    (i32.shl
                       (i32.add
-                        (i32.mul (global.get $fp) (i32.const 9))
+                        (i32.mul (local.get $fp) (i32.const 9))
                         (i32.add (local.get $i) (i32.const 1)))
-                      (i32.const 4)))
+                      (i32.const 2)))
                   (i32.const 0))
                 (local.set $i (i32.add (local.get $i) (i32.const 1)))
                 (br $call_zero)))
-            (global.set $pc
+            (local.set $pc
               (i32.or
-                (i32.load8_u offset=1 (local.get $base))
+                (local.get $x)
                 (i32.shl (i32.load8_u offset=2 (local.get $base))
                          (i32.const 8))))
             (br $continue)
           )
           ;; 26 · RET
-          (if (i32.eqz (global.get $fp))
-            (then (return (call $die (i32.const 11)))))
-          (global.set $pc
+          (if (i32.eqz (local.get $fp))
+            (then (return (call $sync_die (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps) (i32.const 11)))))
+          (local.set $pc
             (i32.load
               (i32.add (i32.const 21504)
-                (i32.mul (global.get $fp) (i32.const 36)))))
-          (global.set $fp (i32.sub (global.get $fp) (i32.const 1)))
+                (i32.mul (local.get $fp) (i32.const 36)))))
+          (local.set $fp (i32.sub (local.get $fp) (i32.const 1)))
           (br $continue)
         )
         ;; 27 · HALT
-        (global.set $steps (i32.add (global.get $steps) (i32.const 1)))
-        (return (call $stop))
+        (local.set $steps (i32.add (local.get $steps) (i32.const 1)))
+        (return (call $sync_stop (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps)))
       )
 
-      (global.set $steps (i32.add (global.get $steps) (i32.const 1)))
+      (local.set $steps (i32.add (local.get $steps) (i32.const 1)))
       (br $loop))
 
-    (call $stop))
+    (call $sync_stop (local.get $pc) (local.get $sp) (local.get $fp) (local.get $steps)))
 
   (func (export "vm_result") (result i32) (global.get $result))
   (func (export "vm_depth") (result i32) (global.get $depth))

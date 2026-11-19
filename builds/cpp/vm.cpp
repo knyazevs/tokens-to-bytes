@@ -171,16 +171,17 @@ i32 vm_run(i32 limit) {
       case OP_DIV:
         if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
         b = values[--sp];
+        a = values[--sp];
         if (b == 0) { err = ERR_ZERO; goto fail; }
-        a = values[sp - 1];
-        if (a == (i32)0x80000000 && b == -1) values[sp - 1] = a;
-        else values[sp - 1] = a / b;
+        if (a == (i32)0x80000000 && b == -1) values[sp++] = a;
+        else values[sp++] = a / b;
         break;
       case OP_MOD:
         if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
         b = values[--sp];
+        a = values[--sp];
         if (b == 0) { err = ERR_ZERO; goto fail; }
-        values[sp - 1] %= b;
+        values[sp++] = a % b;
         break;
       case OP_EQ:
         if (sp < 2) { err = ERR_UNDERFLOW; goto fail; }
