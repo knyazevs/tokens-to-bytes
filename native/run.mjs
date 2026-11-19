@@ -20,8 +20,8 @@ const targets = {
     exe: 'native/bench_types.exe',
   },
   vm: {
-    name: 'Duel 3: Stack VM Bytecode Interpreter (Direct Threading ASM vs C++ -O3)',
-    sources: ['native/vm_harness.cpp', 'native/vm_cpp.cpp', 'native/vm_asm.s'],
+    name: 'Duel 3: Stack VM Bytecode Interpreter (Raw ASM & Macro-ASM vs C++ -O3)',
+    sources: ['native/vm_harness.cpp', 'native/vm_cpp.cpp', 'native/vm_asm.s', 'native/vm_macro.S'],
     exe: 'native/bench_vm.exe',
   },
 };
