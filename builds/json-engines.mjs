@@ -3,7 +3,7 @@
 export const JSON_ENGINES = [
   {
     id: 'manual',
-    name: 'Ручной байткод',
+    name: 'Ручной (без opt)',
     short: 'manual',
     file: 'json.wasm',
     method: 'байткод без компилятора',
@@ -11,6 +11,17 @@ export const JSON_ENGINES = [
     source: 'projects/json/json.wat',
     authoring: 'projects/json/json.wat',
     tone: '#3b82f6',
+  },
+  {
+    id: 'manual-opt',
+    name: 'Ручной + wasm-opt',
+    short: 'manual-opt',
+    file: 'json-opt.wasm',
+    method: 'байткод + wasm-opt -Oz',
+    toolchain: 'WAT → wasm-as → wasm-opt -Oz',
+    source: 'projects/json/json.wat',
+    authoring: 'projects/json/json.wat',
+    tone: '#06b6d4',
   },
   {
     id: 'rust',

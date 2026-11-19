@@ -30,3 +30,17 @@ if (result.error) {
 if (result.status !== 0) process.exit(result.status ?? 1);
 
 console.log(`${out}: ${fs.statSync(path.join(root, out)).size} B`);
+
+const optOut = 'projects/calculator/calc-opt.wasm';
+const optLocal = [
+  path.join(root, '.tools/node_modules/.bin/wasm-opt.cmd'),
+  path.join(root, '.tools/node_modules/.bin/wasm-opt'),
+].find((p) => fs.existsSync(p));
+const optBin = process.env.WASM_OPT || optLocal || 'wasm-opt';
+const optArgs = [out, '-Oz', '--enable-bulk-memory-opt', '-o', optOut];
+const optResult = process.platform === 'win32' && /\.cmd$/i.test(optBin)
+  ? spawnSync(process.env.ComSpec || 'cmd.exe', ['/c', optBin, ...optArgs], { cwd: root, stdio: 'inherit' })
+  : spawnSync(optBin, optArgs, { cwd: root, stdio: 'inherit' });
+if (optResult.status === 0) {
+  console.log(`${optOut}: ${fs.statSync(path.join(root, optOut)).size} B`);
+}

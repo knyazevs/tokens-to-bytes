@@ -3,7 +3,7 @@
 export const REGEX_ENGINES = [
   {
     id: 'manual',
-    name: 'Ручной байткод',
+    name: 'Ручной (без opt)',
     short: 'manual',
     file: 're.wasm',
     method: 'байткод без компилятора',
@@ -11,6 +11,17 @@ export const REGEX_ENGINES = [
     source: 'projects/regex/re.wat',
     authoring: 'projects/regex/re.wat',
     tone: '#3b82f6',
+  },
+  {
+    id: 'manual-opt',
+    name: 'Ручной + wasm-opt',
+    short: 'manual-opt',
+    file: 're-opt.wasm',
+    method: 'байткод + wasm-opt -Oz',
+    toolchain: 'WAT → wasm-as → wasm-opt -Oz',
+    source: 'projects/regex/re.wat',
+    authoring: 'projects/regex/re.wat',
+    tone: '#06b6d4',
   },
   {
     id: 'rust',

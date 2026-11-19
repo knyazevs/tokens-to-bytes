@@ -63,11 +63,16 @@ const wasmOpt = process.env.WASM_OPT || localBin('wasm-opt') || 'wasm-opt';
 const asc = process.env.ASC || localBin('asc') || 'asc';
 
 async function buildManual() {
-  if (!want('manual')) return;
+  if (!want('manual') && !want('manual-opt')) return;
   const { src, out } = project.manual;
   run(wasmAs, [src, '-o', out]);
   report(out);
   await validate(out);
+
+  const optOut = out.replace(/\.wasm$/, '-opt.wasm');
+  run(wasmOpt, [out, '-Oz', '--enable-bulk-memory-opt', '-o', optOut]);
+  report(optOut);
+  await validate(optOut);
 }
 
 async function buildC() {

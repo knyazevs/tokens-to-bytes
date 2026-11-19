@@ -1,6 +1,6 @@
 {
   "tokenizer": "o200k_base",
-  "generatedAt": "2026-11-18T22:38:24.815Z",
+  "generatedAt": "2026-11-19T16:20:37.397Z",
   "note": "artifactTokens — токены естественной формы артефакта (lower bound на стоимость генерации); binaryBase64Tokens — токены base64-представления wasm.",
   "engines": {
     "manual": {
@@ -9,6 +9,13 @@
       "artifactTokens": 10727,
       "binaryBase64Tokens": 2731,
       "binaryBytes": 3449
+    },
+    "manual-opt": {
+      "authoringFile": "projects/regex/re.wat",
+      "authoringBytes": 33268,
+      "artifactTokens": 10727,
+      "binaryBase64Tokens": 2381,
+      "binaryBytes": 3050
     },
     "rust": {
       "authoringFile": "builds/rust-regex/src/lib.rs",

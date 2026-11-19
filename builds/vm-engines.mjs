@@ -3,7 +3,7 @@
 export const VM_ENGINES = [
   {
     id: 'manual',
-    name: 'Ручной байткод',
+    name: 'Ручной (без opt)',
     short: 'manual',
     file: 'vm.wasm',
     method: 'байткод без компилятора',
@@ -11,6 +11,17 @@ export const VM_ENGINES = [
     source: 'projects/vm/vm.wat',
     authoring: 'projects/vm/vm.wat',
     tone: '#3b82f6',
+  },
+  {
+    id: 'manual-opt',
+    name: 'Ручной + wasm-opt',
+    short: 'manual-opt',
+    file: 'vm-opt.wasm',
+    method: 'байткод + wasm-opt -Oz',
+    toolchain: 'WAT → wasm-as → wasm-opt -Oz',
+    source: 'projects/vm/vm.wat',
+    authoring: 'projects/vm/vm.wat',
+    tone: '#06b6d4',
   },
   {
     id: 'rust',

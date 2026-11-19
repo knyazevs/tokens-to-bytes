@@ -6,7 +6,7 @@ export const BASE = 'projects/calculator';
 export const ENGINES = [
   {
     id: 'manual',
-    name: 'Ручной байткод',
+    name: 'Ручной (без opt)',
     short: 'manual',
     file: 'calc.wasm',
     method: 'байткод без компилятора',
@@ -14,6 +14,17 @@ export const ENGINES = [
     source: 'projects/calculator/calc.wat',
     authoring: 'projects/calculator/calc.wat',
     tone: '#3b82f6',
+  },
+  {
+    id: 'manual-opt',
+    name: 'Ручной + wasm-opt',
+    short: 'manual-opt',
+    file: 'calc-opt.wasm',
+    method: 'байткод + wasm-opt -Oz',
+    toolchain: 'WAT → wasm-as → wasm-opt -Oz',
+    source: 'projects/calculator/calc.wat',
+    authoring: 'projects/calculator/calc.wat',
+    tone: '#06b6d4',
   },
   {
     id: 'rust',

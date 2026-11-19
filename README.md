@@ -14,7 +14,8 @@ repeat `=`.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written bytecode | WAT → wasm, no compiler | 1 418 B | 610 B | 574 B | 17/17 | 3 006 |
+| Hand-written (wasm-as) | WAT → wasm, no compiler | 1 418 B | 610 B | 574 B | 17/17 | 3 006 |
+| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 1 401 B | 606 B | 567 B | 17/17 | 3 006 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 2 042 B | 914 B | 869 B | 17/17 | 1 548 |
 | AssemblyScript | asc → wasm-opt | 1 164 B | 616 B | 588 B | 17/17 | 1 411 |
 | C | clang --target=wasm32-freestanding | 1 935 B | 944 B | 883 B | 17/17 | 1 209 |
@@ -41,7 +42,8 @@ at `0x10000` and the root-string buffer at `0x20000`.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written bytecode | WAT → wasm, no compiler | 3 271 B | 1 385 B | 1 268 B | 27/27 | 9 556 |
+| Hand-written (wasm-as) | WAT → wasm, no compiler | 3 271 B | 1 385 B | 1 268 B | 27/27 | 9 556 |
+| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 3 029 B | 1 372 B | 1 256 B | 27/27 | 9 556 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 4 699 B | 2 038 B | 1 843 B | 27/27 | 4 135 |
 | AssemblyScript | asc → wasm-opt | 3 190 B | 1 378 B | 1 259 B | 27/27 | 3 828 |
 | C | clang --target=wasm32-freestanding | 4 137 B | 1 866 B | 1 644 B | 27/27 | 3 303 |
@@ -67,7 +69,8 @@ backtracking into error `8` instead of a hang.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written bytecode | WAT → wasm, no compiler | 3 449 B | 1 589 B | 1 427 B | 61/61 | 10 727 |
+| Hand-written (wasm-as) | WAT → wasm, no compiler | 3 449 B | 1 589 B | 1 427 B | 61/61 | 10 727 |
+| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 3 050 B | 1 501 B | 1 378 B | 61/61 | 10 727 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 4 005 B | 1 933 B | 1 812 B | 61/61 | 4 679 |
 | AssemblyScript | asc → wasm-opt | 3 132 B | 1 491 B | 1 386 B | 61/61 | 4 650 |
 | C | clang --target=wasm32-freestanding | 3 761 B | 1 880 B | 1 703 B | 61/61 | 4 182 |
@@ -94,7 +97,8 @@ steps.
 
 | Implementation | How it was made | `.wasm` | gzip | brotli | Tests | Artifact tokens |
 |---|---|---:|---:|---:|---:|---:|
-| Hand-written bytecode | WAT → wasm, no compiler | 2 513 B | 878 B | 782 B | 52/52 | 7 948 |
+| Hand-written (wasm-as) | WAT → wasm, no compiler | 2 513 B | 878 B | 782 B | 52/52 | 7 948 |
+| Hand-written + wasm-opt | WAT → wasm-as → wasm-opt -Oz | 2 135 B | 896 B | 804 B | 52/52 | 7 948 |
 | Rust | rustc → wasm32-unknown-unknown → wasm-opt | 2 255 B | 1 138 B | 1 054 B | 52/52 | 2 820 |
 | AssemblyScript | asc → wasm-opt | 1 693 B | 953 B | 874 B | 52/52 | 2 713 |
 | C | clang --target=wasm32-freestanding | 1 897 B | 1 072 B | 977 B | 52/52 | 2 228 |
