@@ -18,6 +18,8 @@
     "build:vm": "node builds/build.mjs vm",
     "check:vm-asm": "node builds/check-vm-asm.mjs",
     "lint:asm": "node builds/lint-asm.mjs",
+    "harness:run": "node harness/runner.mjs",
+    "harness:report": "node harness/reporter.mjs",
     "all": "npm run tokens && npm run measure"
   },
   "devDependencies": {

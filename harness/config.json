@@ -1,0 +1,32 @@
+{
+  "version": "1.0.0",
+  "name": "llm-asm-evolution-benchmark",
+  "description": "Autonomous closed-loop optimization benchmark measuring LLM low-level code synthesis, token cost, error rates, and iterations to hardware parity.",
+  "tasks": {
+    "http-engine-linux": {
+      "id": "http-engine-linux",
+      "name": "Bare-Metal Linux x86-64 HTTP Engine",
+      "prompt": "harness/prompts/http-engine-linux.md",
+      "output_file": "harness/sandbox/server.S",
+      "binary_file": "harness/sandbox/server",
+      "wsl_binary": "/mnt/d/projects/wasm/harness/sandbox/server",
+      "build_command": "wsl gcc -nostdlib -static -O3 -march=native /mnt/d/projects/wasm/harness/sandbox/server.S -o /mnt/d/projects/wasm/harness/sandbox/server && wsl strip --strip-all /mnt/d/projects/wasm/harness/sandbox/server",
+      "port": 8098,
+      "test_command": "node builds/test-http.mjs 8098",
+      "bench_command": "node builds/bench-multi.mjs 8098 20000 40",
+      "target": {
+        "tests_passed": 8,
+        "max_binary_size_bytes": 10000,
+        "min_rps": 130000,
+        "max_p99_latency_us": 2000
+      },
+      "reference": {
+        "author": "Human/Macro-ASM Baseline",
+        "tests_passed": 8,
+        "binary_size_bytes": 2632,
+        "rps": 139581,
+        "p99_latency_us": 1502
+      }
+    }
+  }
+}

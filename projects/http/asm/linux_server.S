@@ -155,12 +155,12 @@ events:
 .macro FAST_DIV10 reg
     mov eax, \reg
     mov edx, eax
-    mov ecx, 0xcccccccd
-    imul rax, rcx
+    mov r11, 0xcccccccd
+    imul rax, r11
     shr rax, 35
-    lea ecx, [rax + rax*4]
-    add ecx, ecx
-    sub edx, ecx
+    lea r11d, [rax + rax*4]
+    add r11d, r11d
+    sub edx, r11d
     mov \reg, eax
 .endm
 
