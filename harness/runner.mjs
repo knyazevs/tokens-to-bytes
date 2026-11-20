@@ -31,6 +31,8 @@ let modelName = 'google/gemini-4-carbon';
 let maxIters = 4;
 let mode = 'api'; // 'api' | 'replay'
 let inputFile = null;
+let effort = null;
+let userMaxTokens = 65536;
 let apiKey = process.env.POLZA_API_KEY || 'pza_o0s35kdIJ9wRuOd8t0tkjgsKSqQqV7HH';
 
 for (const arg of args) {
@@ -39,6 +41,8 @@ for (const arg of args) {
   else if (arg.startsWith('--max-iters=')) maxIters = parseInt(arg.split('=')[1], 10);
   else if (arg.startsWith('--mode=')) mode = arg.split('=')[1];
   else if (arg.startsWith('--input=')) inputFile = arg.split('=')[1];
+  else if (arg.startsWith('--effort=')) effort = arg.split('=')[1];
+  else if (arg.startsWith('--max-tokens=')) userMaxTokens = parseInt(arg.split('=')[1], 10);
   else if (arg.startsWith('--api-key=')) apiKey = arg.split('=')[1];
 }
 
@@ -55,6 +59,8 @@ console.log(`${ANSI.bold}${ANSI.cyan}===========================================
 console.log(`Task:        ${ANSI.bold}${task.name}${ANSI.reset} (${task.id})`);
 console.log(`Model:       ${ANSI.bold}${modelName}${ANSI.reset}`);
 console.log(`Mode:        ${ANSI.bold}${mode}${ANSI.reset}`);
+if (effort) console.log(`Effort:      ${ANSI.bold}${effort}${ANSI.reset}`);
+console.log(`Max Tokens:  ${userMaxTokens}`);
 console.log(`Max Iters:   ${maxIters}\n`);
 
 const telemetry = {
@@ -90,14 +96,18 @@ function extractCodeBlock(text) {
   return code;
 }
 
-function callPolzaApi(model, messages, maxTokens = 65536) {
+function callPolzaApi(model, messages, maxTokens = 65536, reasoningEffort = null) {
   return new Promise((resolve, reject) => {
-    const payload = JSON.stringify({
+    const payloadObj = {
       model,
       messages,
       max_tokens: maxTokens,
       temperature: 0.2
-    });
+    };
+    if (reasoningEffort) {
+      payloadObj.reasoning_effort = reasoningEffort;
+    }
+    const payload = JSON.stringify(payloadObj);
 
     const agent = new https.Agent({ keepAlive: true, timeout: 900000 });
     const req = https.request({
@@ -169,7 +179,7 @@ async function getCandidateCode(iter, previousFeedback) {
 
     console.log(`  ${ANSI.cyan}Calling polza.ai API (${modelName})...${ANSI.reset}`);
     const t0 = Date.now();
-    const response = await callPolzaApi(modelName, conversation);
+    const response = await callPolzaApi(modelName, conversation, userMaxTokens, effort);
     const durationSec = ((Date.now() - t0) / 1000).toFixed(1);
 
     const usage = response.usage || {};
@@ -311,7 +321,7 @@ async function runHarness() {
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const safeModel = modelName.replace(/[\/:]/g, '_');
-  const teleFile = path.resolve(`harness/telemetry/run_${taskId}_${safeModel}_macro-assisted_${timestamp}.json`);
+  const teleFile = path.resolve(`harness/telemetry/run_${taskId}_${safeModel}_${timestamp}.json`);
   fs.writeFileSync(teleFile, JSON.stringify(telemetry, null, 2), 'utf8');
   console.log(`\nTelemetry saved to: ${ANSI.cyan}${teleFile}${ANSI.reset}`);
   console.log(`Total Token Cost: ${ANSI.bold}${telemetry.totalTokens.cost_rub.toFixed(2)} ₽${ANSI.reset} (${telemetry.totalTokens.input} in / ${telemetry.totalTokens.output} out)\n`);
