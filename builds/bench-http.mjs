@@ -9,6 +9,7 @@ export async function benchHttp({ port = 8080, concurrency = 30, totalRequests =
   function runClient() {
     return new Promise((resolve, reject) => {
       const client = net.createConnection({ port, host: '127.0.0.1' }, () => {
+        client.setNoDelay(true);
         let sent = 0;
         let received = 0;
         let buf = '';
@@ -48,9 +49,6 @@ export async function benchHttp({ port = 8080, concurrency = 30, totalRequests =
       });
     });
   }
-
-  // Warmup 500 requests
-  const warmupClient = runClient;
 
   const t0 = process.hrtime.bigint();
   const clients = Array.from({ length: concurrency }, () => runClient());

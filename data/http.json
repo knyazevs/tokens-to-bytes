@@ -1,21 +1,31 @@
 [
   {
+    "id": "pure-asm",
+    "name": "Pure ASM (x86-64)",
+    "tests": "8/8",
+    "rps": 63014,
+    "medianUs": 413,
+    "p99Us": 1049,
+    "sourceBytes": 14593,
+    "exeSize": 110592
+  },
+  {
     "id": "macro-asm",
     "name": "Macro-ASM (x86-64)",
     "tests": "8/8",
-    "rps": 62227,
-    "medianUs": 436,
-    "p99Us": 970,
-    "sourceBytes": 15045,
-    "exeSize": 146944
+    "rps": 76331,
+    "medianUs": 371,
+    "p99Us": 683,
+    "sourceBytes": 14702,
+    "exeSize": 146432
   },
   {
     "id": "c",
     "name": "C (Zero-Alloc)",
     "tests": "8/8",
-    "rps": 69320,
-    "medianUs": 402,
-    "p99Us": 754,
+    "rps": 25338,
+    "medianUs": 908,
+    "p99Us": 6197,
     "sourceBytes": 10101,
     "exeSize": 151040
   },
@@ -23,9 +33,9 @@
     "id": "cpp",
     "name": "C++20 (Zero-Alloc)",
     "tests": "8/8",
-    "rps": 71248,
-    "medianUs": 396,
-    "p99Us": 721,
+    "rps": 25259,
+    "medianUs": 874,
+    "p99Us": 6368,
     "sourceBytes": 9345,
     "exeSize": 12756992
   },
@@ -33,9 +43,9 @@
     "id": "rust",
     "name": "Rust (std)",
     "tests": "8/8",
-    "rps": 50752,
-    "medianUs": 534,
-    "p99Us": 943,
+    "rps": 22927,
+    "medianUs": 737,
+    "p99Us": 6466,
     "sourceBytes": 5523,
     "exeSize": 182272
   },
@@ -43,9 +53,9 @@
     "id": "node",
     "name": "Node.js (baseline)",
     "tests": "8/8",
-    "rps": 33373,
-    "medianUs": 723,
-    "p99Us": 3842,
+    "rps": 26185,
+    "medianUs": 1059,
+    "p99Us": 2647,
     "sourceBytes": 1253,
     "exeSize": 0
   }

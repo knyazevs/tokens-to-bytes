@@ -25,6 +25,16 @@ static int num_fds = 0;
 /* Macro-ASM kernel */
 extern void asm_handle_request(const char *req, int req_len, char *out_buf, int *out_len);
 
+static inline char *fast_find_crlf_crlf(char *buf, int len) {
+    if (len < 4) return NULL;
+    for (int j = 0; j <= len - 4; j++) {
+        if (*(unsigned int*)(buf + j) == 0x0a0d0a0d) {
+            return buf + j;
+        }
+    }
+    return NULL;
+}
+
 static void close_conn(int idx) {
     if (conns[idx].fd != INVALID_SOCKET) {
         closesocket(conns[idx].fd);
@@ -131,7 +141,7 @@ int main(int argc, char **argv) {
                         conns[i].in_buf[conns[i].in_len] = '\0';
 
                         while (1) {
-                            char *delim = strstr(conns[i].in_buf, "\r\n\r\n");
+                            char *delim = fast_find_crlf_crlf(conns[i].in_buf, conns[i].in_len);
                             if (!delim) break;
                             int req_len = (int)(delim - conns[i].in_buf) + 4;
                             
@@ -143,10 +153,8 @@ int main(int argc, char **argv) {
                                 break;
                             }
 
-                            char save = conns[i].in_buf[req_len];
-                            conns[i].in_buf[req_len] = '\0';
+                            /* Zero-copy, non-destructive parsing */
                             asm_handle_request(conns[i].in_buf, req_len, conns[i].out_buf, &conns[i].out_len);
-                            conns[i].in_buf[req_len] = save;
 
                             int rest = conns[i].in_len - req_len;
                             if (rest > 0) {

@@ -13,6 +13,29 @@ const clang = path.join(
 
 const targets = [
   {
+    id: 'pure-asm',
+    name: 'Pure ASM (x86-64)',
+    compile: () => {
+      const res = spawnSync(
+        clang,
+        [
+          '-O3',
+          '-march=native',
+          path.join(root, 'projects/http/asm/pure_server.S'),
+          '-lws2_32',
+          '-lkernel32',
+          '-o',
+          path.join(root, 'projects/http/asm/server_pure.exe')
+        ],
+        { stdio: 'pipe' }
+      );
+      if (res.status !== 0) throw new Error(res.stderr.toString());
+      return path.join(root, 'projects/http/asm/server_pure.exe');
+    },
+    sources: ['projects/http/asm/pure_server.S'],
+    exe: 'projects/http/asm/server_pure.exe'
+  },
+  {
     id: 'macro-asm',
     name: 'Macro-ASM (x86-64)',
     compile: () => {
@@ -145,15 +168,16 @@ async function measureOne(t, port) {
     };
   } finally {
     child.kill();
-    await new Promise((r) => setTimeout(r, 200));
+    await new Promise((r) => setTimeout(r, 300));
   }
 }
 
 async function main() {
   console.log('=== HTTP Arena Multi-Language Bare-Metal Benchmark ===\n');
-  console.log('Testing and measuring 5 implementations against RFC 7230 (20,000 requests each)...\n');
+  console.log('Testing and measuring 6 implementations against RFC 7230 (20,000 requests each)...\n');
 
-  let port = 8100;
+  /* Use non-colliding base port */
+  let port = 8300 + Math.floor(Math.random() * 50) * 10;
   const results = [];
 
   for (const t of targets) {
@@ -163,24 +187,56 @@ async function main() {
       console.log(`OK: ${res.rps.toLocaleString('ru-RU')} req/s (p99: ${res.p99Us} µs)`);
       results.push(res);
     } catch (err) {
-      console.log(`FAILED: ${err.message}`);
+      console.log(`FAIL: ${err.message}`);
     }
   }
 
-  console.log('\n================================================================================================');
-  console.log('| Реализация            | Тесты | Запросов/с  | Median Latency | p99 Latency | Исходник | Бинарник |');
-  console.log('|-----------------------|:-----:|------------:|---------------:|------------:|---------:|---------:|');
-  for (const r of results) {
-    const rpsStr = r.rps.toLocaleString('ru-RU').padStart(11);
-    const medStr = `${r.medianUs} µs`.padStart(14);
-    const p99Str = `${r.p99Us} µs`.padStart(11);
-    const srcStr = `${r.sourceBytes.toLocaleString('ru-RU')} Б`.padStart(8);
-    const exeStr = r.exeSize ? `${Math.round(r.exeSize / 1024)} КБ`.padStart(8) : 'node.exe'.padStart(8);
-    console.log(`| ${r.name.padEnd(21)} |  ${r.tests}  | ${rpsStr} | ${medStr} | ${p99Str} | ${srcStr} | ${exeStr} |`);
-  }
-  console.log('================================================================================================\n');
+  console.log('\n' + '='.repeat(96));
+  console.log(
+    '| ' +
+      'Реализация'.padEnd(21) +
+      ' | Тесты | ' +
+      'Запросов/с'.padStart(12) +
+      ' | ' +
+      'Median Latency' +
+      ' | ' +
+      'p99 Latency' +
+      ' | ' +
+      'Исходник' +
+      ' | ' +
+      'Бинарник' +
+      ' |'
+  );
+  console.log(
+    '|' +
+      '-'.repeat(23) +
+      '|:-----:|' +
+      '-'.repeat(14) +
+      ':|' +
+      '-'.repeat(16) +
+      ':|' +
+      '-'.repeat(13) +
+      ':|' +
+      '-'.repeat(10) +
+      ':|' +
+      '-'.repeat(10) +
+      ':|'
+  );
 
-  fs.writeFileSync(path.join(root, 'data/http.json'), JSON.stringify(results, null, 2), 'utf8');
+  for (const r of results) {
+    const sizeStr = r.exeSize ? `${Math.round(r.exeSize / 1024)} КБ` : 'node.exe';
+    console.log(
+      `| ${r.name.padEnd(21)} |  ${r.tests}  | ${r.rps.toLocaleString('ru-RU').padStart(12)} | ${(
+        r.medianUs + ' µs'
+      ).padStart(14)} | ${(r.p99Us + ' µs').padStart(11)} | ${(r.sourceBytes.toLocaleString('ru-RU') + ' Б').padStart(
+        8
+      )} | ${sizeStr.padStart(8)} |`
+    );
+  }
+  console.log('='.repeat(96) + '\n');
+
+  const outPath = path.join(root, 'data/http.json');
+  fs.writeFileSync(outPath, JSON.stringify(results, null, 2), 'utf-8');
   console.log('Saved data to data/http.json\n');
 }
 

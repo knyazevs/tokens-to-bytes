@@ -12,7 +12,7 @@
 #define LEN_405 73
 
 .section .rdata,"dr"
-.p2align 4
+.p2align 5
 str_ok_plain:
     .ascii "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: "
 str_ok_json:
@@ -25,82 +25,66 @@ str_404:
     .ascii "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: keep-alive\r\n\r\n"
 str_405:
     .ascii "HTTP/1.1 405 Method Not Allowed\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-.space 32, 0
+.space 64, 0
 
 .text
 .globl asm_handle_request
 .def asm_handle_request; .scl 2; .type 32; .endef
 
 /*
- * Overlapping SSE Macros:
- * Eliminates ERMS startup latency on short buffers (<64 bytes)
+ * AVX2 256-bit Overlapping Vector Macros:
+ * Copies 59 bytes in TWO 256-bit instructions!
  * Zero branching, 0 microcode loops
  */
 .macro COPY_59_PLAIN_FAST
-    movups xmm0, [rip + str_ok_plain]
-    movups [r8], xmm0
-    movups xmm1, [rip + str_ok_plain + 16]
-    movups [r8 + 16], xmm1
-    movups xmm2, [rip + str_ok_plain + 32]
-    movups [r8 + 32], xmm2
-    movups xmm3, [rip + str_ok_plain + 43]
-    movups [r8 + 43], xmm3
+    vmovups ymm0, [rip + str_ok_plain]
+    vmovups [r8], ymm0
+    vmovups ymm1, [rip + str_ok_plain + 27]
+    vmovups [r8 + 27], ymm1
     add r8, 59
 .endm
 
 .macro COPY_65_JSON_FAST
-    movups xmm0, [rip + str_ok_json]
-    movups [r8], xmm0
-    movups xmm1, [rip + str_ok_json + 16]
-    movups [r8 + 16], xmm1
-    movups xmm2, [rip + str_ok_json + 32]
-    movups [r8 + 32], xmm2
-    movups xmm3, [rip + str_ok_json + 48]
-    movups [r8 + 48], xmm3
-    movups xmm0, [rip + str_ok_json + 49]
-    movups [r8 + 49], xmm0
+    vmovups ymm0, [rip + str_ok_json]
+    vmovups [r8], ymm0
+    vmovups ymm1, [rip + str_ok_json + 32]
+    vmovups [r8 + 32], ymm1
+    vmovups ymm2, [rip + str_ok_json + 33]
+    vmovups [r8 + 33], ymm2
     add r8, 65
 .endm
 
 .macro COPY_28_CRLF_FAST
-    movups xmm0, [rip + str_crlf_crlf]
-    movups [r8], xmm0
-    movups xmm1, [rip + str_crlf_crlf + 12]
-    movups [r8 + 12], xmm1
+    vmovups xmm0, [rip + str_crlf_crlf]
+    vmovups [r8], xmm0
+    vmovups xmm1, [rip + str_crlf_crlf + 12]
+    vmovups [r8 + 12], xmm1
     add r8, 28
 .endm
 
 .macro COPY_69_404_FAST
-    movups xmm0, [rip + str_404]
-    movups [r8], xmm0
-    movups xmm1, [rip + str_404 + 16]
-    movups [r8 + 16], xmm1
-    movups xmm2, [rip + str_404 + 32]
-    movups [r8 + 32], xmm2
-    movups xmm3, [rip + str_404 + 48]
-    movups [r8 + 48], xmm3
-    movups xmm0, [rip + str_404 + 53]
-    movups [r8 + 53], xmm0
+    vmovups ymm0, [rip + str_404]
+    vmovups [r8], ymm0
+    vmovups ymm1, [rip + str_404 + 32]
+    vmovups [r8 + 32], ymm1
+    vmovups ymm2, [rip + str_404 + 37]
+    vmovups [r8 + 37], ymm2
     add r8, 69
 .endm
 
 .macro COPY_73_405_FAST
-    movups xmm0, [rip + str_405]
-    movups [r8], xmm0
-    movups xmm1, [rip + str_405 + 16]
-    movups [r8 + 16], xmm1
-    movups xmm2, [rip + str_405 + 32]
-    movups [r8 + 32], xmm2
-    movups xmm3, [rip + str_405 + 48]
-    movups [r8 + 48], xmm3
-    movups xmm0, [rip + str_405 + 57]
-    movups [r8 + 57], xmm0
+    vmovups ymm0, [rip + str_405]
+    vmovups [r8], ymm0
+    vmovups ymm1, [rip + str_405 + 32]
+    vmovups [r8 + 32], ymm1
+    vmovups ymm2, [rip + str_405 + 41]
+    vmovups [r8 + 41], ymm2
     add r8, 73
 .endm
 
 /*
  * Windows x64 ABI Zero-Preserve Handler:
- * - Uses ONLY volatile registers: rax, rcx, rdx, r8, r9, r10, r11, xmm0..xmm3
+ * - Uses ONLY volatile registers: rax, rcx, rdx, r8, r9, r10, r11, ymm0..ymm3
  * - ZERO pushes, ZERO pops of non-volatile registers
  *
  * rcx = const char *req
@@ -297,10 +281,10 @@ asm_handle_request:
     lea r10, [rsp + 38 + rcx]              /* r10 = position for tail */
 
     /* Append ',"message":"Hello, World!"}' (27 bytes) with Overlapping SSE */
-    movups xmm0, [rip + str_json_tail]
-    movups [r10], xmm0
-    movups xmm1, [rip + str_json_tail + 11]
-    movups [r10 + 11], xmm1
+    vmovups xmm0, [rip + str_json_tail]
+    vmovups [r10], xmm0
+    vmovups xmm1, [rip + str_json_tail + 11]
+    vmovups [r10 + 11], xmm1
     add r10, 27
 
     /* Calculate total json body length: r10 - (rsp + 32) */
@@ -324,17 +308,18 @@ asm_handle_request:
     COPY_28_CRLF_FAST
 
     /* Copy json body from [rsp + 32] (ecx bytes) using Overlapping SSE */
-    movups xmm0, [rsp + 32]
-    movups [r8], xmm0
-    movups xmm1, [rsp + 48]
-    movups [r8 + 16], xmm1
-    movups xmm2, [rsp + 32 + rcx - 16]
-    movups [r8 + rcx - 16], xmm2
+    vmovups xmm0, [rsp + 32]
+    vmovups [r8], xmm0
+    vmovups xmm1, [rsp + 48]
+    vmovups [r8 + 16], xmm1
+    vmovups xmm2, [rsp + 32 + rcx - 16]
+    vmovups [r8 + rcx - 16], xmm2
     add r8, rcx
 
 .L_finish:
     /* Update *out_len */
     sub r8, qword ptr [rsp] /* r8 = bytes written this request */
     add dword ptr [r9], r8d
+    vzeroupper
     add rsp, 104
     ret
