@@ -3,6 +3,26 @@
   "name": "llm-asm-evolution-benchmark",
   "description": "Autonomous closed-loop optimization benchmark measuring LLM low-level code synthesis, token cost, error rates, and iterations to hardware parity.",
   "tasks": {
+    "duel3-stack-vm": {
+      "id": "duel3-stack-vm",
+      "name": "Native x86-64 Stack VM Bytecode Interpreter",
+      "prompt": "harness/prompts/duel3-stack-vm.md",
+      "output_file": "harness/sandbox/candidate_vm.S",
+      "binary_file": "harness/sandbox/vm_bench.exe",
+      "build_command": "D:\\projects\\wasm\\.tools\\node_modules\\@lasm\\emscripten-win32-x64\\tools\\emscripten-6.0.9-win32-x64-tools\\bin\\clang.exe -O3 -march=native -mavx2 harness/eval_vm.cpp native/vm_cpp.cpp native/vm_macro.S harness/sandbox/candidate_vm.S -o harness/sandbox/vm_bench.exe",
+      "eval_command": "harness\\sandbox\\vm_bench.exe",
+      "target": {
+        "verified": true,
+        "max_cycles_per_op": 1.80,
+        "min_speedup_percent": 50.0
+      },
+      "reference": {
+        "author": "Macro-ASM Direct Threading Baseline",
+        "cpp_cycles": 3.66,
+        "candidate_cycles": 1.65,
+        "speedup_percent": 54.4
+      }
+    },
     "http-engine-linux": {
       "id": "http-engine-linux",
       "name": "Bare-Metal Linux x86-64 HTTP Engine",

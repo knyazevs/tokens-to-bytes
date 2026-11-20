@@ -2,10 +2,12 @@
 /**
  * Autonomous LLM Optimization Harness (Runner)
  * Executes closed-loop evolutionary benchmarking for low-level systems code.
+ * Supports direct API integration with polza.ai frontier models.
  */
 
 import fs from 'fs';
 import path from 'path';
+import https from 'https';
 import { execSync, spawn } from 'child_process';
 
 const ANSI = {
@@ -24,11 +26,12 @@ const config = JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8'));
 
 // Parse CLI args
 const args = process.argv.slice(2);
-let taskId = 'http-engine-linux';
-let modelName = 'baseline-ref';
-let maxIters = 5;
-let mode = 'replay'; // 'replay' | 'api' | 'manual'
+let taskId = 'duel3-stack-vm';
+let modelName = 'google/gemini-4-carbon';
+let maxIters = 4;
+let mode = 'api'; // 'api' | 'replay'
 let inputFile = null;
+let apiKey = process.env.POLZA_API_KEY || 'pza_o0s35kdIJ9wRuOd8t0tkjgsKSqQqV7HH';
 
 for (const arg of args) {
   if (arg.startsWith('--task=')) taskId = arg.split('=')[1];
@@ -36,6 +39,7 @@ for (const arg of args) {
   else if (arg.startsWith('--max-iters=')) maxIters = parseInt(arg.split('=')[1], 10);
   else if (arg.startsWith('--mode=')) mode = arg.split('=')[1];
   else if (arg.startsWith('--input=')) inputFile = arg.split('=')[1];
+  else if (arg.startsWith('--api-key=')) apiKey = arg.split('=')[1];
 }
 
 const task = config.tasks[taskId];
@@ -51,9 +55,7 @@ console.log(`${ANSI.bold}${ANSI.cyan}===========================================
 console.log(`Task:        ${ANSI.bold}${task.name}${ANSI.reset} (${task.id})`);
 console.log(`Model:       ${ANSI.bold}${modelName}${ANSI.reset}`);
 console.log(`Mode:        ${ANSI.bold}${mode}${ANSI.reset}`);
-console.log(`Max Iters:   ${maxIters}`);
-console.log(`Target RPS:  ${task.target.min_rps || 'N/A'}`);
-console.log(`Target Size: ${task.target.max_binary_size_bytes || 'N/A'} bytes\n`);
+console.log(`Max Iters:   ${maxIters}\n`);
 
 const telemetry = {
   task: task.id,
@@ -61,7 +63,7 @@ const telemetry = {
   startTime: new Date().toISOString(),
   iterations: [],
   converged: false,
-  totalTokens: { input: 0, output: 0 },
+  totalTokens: { input: 0, output: 0, cost_rub: 0 },
   finalMetrics: null
 };
 
@@ -78,15 +80,106 @@ function runCommandSync(cmd, cwd = process.cwd(), timeoutMs = 25000) {
   }
 }
 
+function extractCodeBlock(text) {
+  let code = text;
+  const match = text.match(/`{3,}(?:assembly|asm|s)?\s*\n?([\s\S]*?)`{3,}/i);
+  if (match) {
+    code = match[1];
+  }
+  code = code.replace(/^`+[a-zA-Z0-9_-]*\s*\n?/m, '').replace(/\n?`+$/m, '').trim();
+  return code;
+}
+
+function callPolzaApi(model, messages, maxTokens = 65536) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify({
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature: 0.2
+    });
+
+    const req = https.request({
+      hostname: 'api.polza.ai',
+      path: '/v1/chat/completions',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Length': Buffer.byteLength(payload)
+      }
+    }, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data);
+          if (json.error) {
+            reject(new Error(`API Error: ${JSON.stringify(json.error)}`));
+          } else {
+            resolve(json);
+          }
+        } catch (e) {
+          reject(new Error(`Failed to parse API response: ${data}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(payload);
+    req.end();
+  });
+}
+
+// Conversation history for multi-turn optimization
+const conversation = [];
+
 async function getCandidateCode(iter, previousFeedback) {
   if (mode === 'replay') {
-    const sourceFile = inputFile || 'projects/http/asm/linux_server.S';
+    const sourceFile = inputFile || 'harness/sandbox/candidate_vm.S';
     console.log(`${ANSI.gray}[Iteration ${iter}] Replaying code from: ${sourceFile}${ANSI.reset}`);
     return fs.readFileSync(sourceFile, 'utf8');
   }
 
   if (mode === 'api') {
-    throw new Error('API mode requires configured model endpoint.');
+    const specPrompt = fs.readFileSync(path.resolve(task.prompt), 'utf8');
+    const skillContent = fs.readFileSync(path.resolve('skills/macro-asm-synthesis/SKILL.md'), 'utf8');
+
+    if (iter === 1) {
+      conversation.push({
+        role: 'system',
+        content: `You are an elite, world-class assembly and systems optimization engineer.\n\n${skillContent}`
+      });
+      conversation.push({
+        role: 'user',
+        content: specPrompt
+      });
+    } else {
+      conversation.push({
+        role: 'user',
+        content: `Your previous implementation failed validation or did not meet the hardware performance target.\n\n${previousFeedback}\n\nPlease analyze the failure and provide the complete revised assembly code enclosed in \`\`\`assembly ... \`\`\`. Retain 100% control over physical registers, use direct threading, and ensure zero clobber spills.`
+      });
+    }
+
+    console.log(`  ${ANSI.cyan}Calling polza.ai API (${modelName})...${ANSI.reset}`);
+    const t0 = Date.now();
+    const response = await callPolzaApi(modelName, conversation);
+    const durationSec = ((Date.now() - t0) / 1000).toFixed(1);
+
+    const usage = response.usage || {};
+    telemetry.totalTokens.input += (usage.prompt_tokens || 0);
+    telemetry.totalTokens.output += (usage.completion_tokens || 0);
+    telemetry.totalTokens.cost_rub += (usage.cost_rub || 0);
+
+    const costStr = usage.cost_rub ? `${usage.cost_rub.toFixed(2)} ₽` : 'N/A';
+    console.log(`  ${ANSI.green}✓ Response received in ${durationSec}s${ANSI.reset} (Tokens: ${usage.prompt_tokens} in / ${usage.completion_tokens} out, Cost: ${costStr})`);
+
+    const assistantMsg = (response.choices?.[0]?.message?.content && response.choices?.[0]?.message?.content.trim())
+      ? response.choices[0].message.content
+      : (response.choices?.[0]?.message?.reasoning || '');
+    conversation.push({ role: 'assistant', content: assistantMsg });
+
+    return extractCodeBlock(assistantMsg);
   }
 
   throw new Error(`Unsupported mode: ${mode}`);
@@ -94,9 +187,6 @@ async function getCandidateCode(iter, previousFeedback) {
 
 async function evaluateCandidate(code, iter) {
   console.log(`\n${ANSI.bold}--- Iteration ${iter}: Evaluation Gate ---${ANSI.reset}`);
-  
-  // Cleanup any lingering server on port
-  runCommandSync(`wsl fuser -k ${task.port}/tcp 2>/dev/null || true`);
 
   // Write candidate code to sandbox
   const outPath = path.resolve(task.output_file);
@@ -108,11 +198,12 @@ async function evaluateCandidate(code, iter) {
     timestamp: new Date().toISOString(),
     linterPassed: false,
     buildPassed: false,
-    testsPassed: 0,
-    testsTotal: task.target.tests_passed,
-    binarySizeBytes: 0,
-    rps: 0,
-    p99LatencyUs: 0,
+    verified: false,
+    cyclesPerOp: 0,
+    macroCyclesPerOp: 0,
+    cppCyclesPerOp: 0,
+    speedupPercent: 0,
+    parityAchieved: false,
     errors: [],
     feedback: ''
   };
@@ -127,10 +218,10 @@ async function evaluateCandidate(code, iter) {
     return record;
   }
   record.linterPassed = true;
-  console.log(`  ${ANSI.green}✓ Gate 1 Passed (Zero CRT, no heavy divisions, packed ABI layout)${ANSI.reset}`);
+  console.log(`  ${ANSI.green}✓ Gate 1 Passed (Invariants checked)${ANSI.reset}`);
 
   // GATE 2: Build
-  console.log(`  [Gate 2] Compiling bare-metal binary...`);
+  console.log(`  [Gate 2] Compiling candidate with Clang -O3...`);
   const buildRes = runCommandSync(task.build_command);
   if (!buildRes.success) {
     console.log(`  ${ANSI.red}✗ Gate 2 Failed: Compilation error${ANSI.reset}`);
@@ -141,88 +232,52 @@ async function evaluateCandidate(code, iter) {
   record.buildPassed = true;
   console.log(`  ${ANSI.green}✓ Gate 2 Passed (Clean binary build)${ANSI.reset}`);
 
-  // Measure binary size
-  const binPath = path.resolve(task.binary_file);
-  if (fs.existsSync(binPath)) {
-    record.binarySizeBytes = fs.statSync(binPath).size;
-    console.log(`  Binary size on disk: ${ANSI.bold}${record.binarySizeBytes} bytes${ANSI.reset}`);
-  }
-
-  // GATE 3: Correctness (Run server & test suite)
-  console.log(`  [Gate 3] Starting server on port ${task.port} and running RFC test suite...`);
-  const binWsl = task.wsl_binary || `/mnt/d/projects/wasm/${task.binary_file.replace(/\\/g, '/')}`;
-  const serverProc = spawn('wsl', [binWsl, String(task.port)], {
-    detached: true,
-    stdio: 'ignore'
-  });
-
-  // Wait 600ms for workers to bind SO_REUSEPORT
-  await new Promise(r => setTimeout(r, 600));
-
-  let testRes = runCommandSync(task.test_command);
-  try {
-    process.kill(-serverProc.pid, 'SIGKILL');
-  } catch {}
-  runCommandSync(`wsl fuser -k ${task.port}/tcp 2>/dev/null || true`);
+  // GATE 3 & 4: Correctness and Cycles Benchmark
+  console.log(`  [Gate 3 & 4] Running hardware verification & cycle benchmark...`);
+  const evalRes = runCommandSync(task.eval_command);
 
   try {
-    const testJson = JSON.parse(testRes.output);
-    record.testsPassed = testJson.passed;
-    record.testsTotal = testJson.total;
-    console.log(`  ${record.testsPassed === record.testsTotal ? ANSI.green : ANSI.red}RFC Tests Passed: ${record.testsPassed} / ${record.testsTotal}${ANSI.reset}`);
-  } catch {
-    console.log(`  ${ANSI.red}✗ Gate 3 Failed: Server crashed or failed tests${ANSI.reset}`);
-    record.errors.push('TEST_FAILED: ' + testRes.output.trim());
-    record.feedback = `[Test Suite Failure]\nServer did not respond or crashed:\n${testRes.output.trim()}`;
-    return record;
-  }
+    const resJson = JSON.parse(evalRes.output.trim());
+    record.verified = resJson.verified;
 
-  if (record.testsPassed < task.target.tests_passed) {
-    record.feedback = `[Test Failures]\nOnly ${record.testsPassed}/${record.testsTotal} passed. Verify Keep-Alive, Pipelining, and route parsing.`;
-    return record;
-  }
+    if (!resJson.verified) {
+      console.log(`  ${ANSI.red}✗ Gate 3 Failed: State verification error (${resJson.stage}): ${resJson.error}${ANSI.reset}`);
+      record.errors.push(`VERIFY_FAILED: ${resJson.error}`);
+      record.feedback = `[Verification Failure in ${resJson.stage}]\n${resJson.error}\nState did not match C++ reference. Ensure correct stack push/pop order and opcode semantics.`;
+      return record;
+    }
 
-  // GATE 4: Performance Benchmark
-  console.log(`  [Gate 4] Executing multi-core performance benchmark...`);
-  const benchServerProc = spawn('wsl', [binWsl, String(task.port)], {
-    detached: true,
-    stdio: 'ignore'
-  });
-  await new Promise(r => setTimeout(r, 600));
+    console.log(`  ${ANSI.green}✓ Gate 3 Passed: 100% state match with C++ and Macro-ASM on all programs!${ANSI.reset}`);
 
-  const benchRes = runCommandSync(task.bench_command, process.cwd(), 35000);
-  try {
-    process.kill(-benchServerProc.pid, 'SIGKILL');
-  } catch {}
-  runCommandSync(`wsl fuser -k ${task.port}/tcp 2>/dev/null || true`);
+    record.cppCyclesPerOp = resJson.cpp_cycles;
+    record.macroCyclesPerOp = resJson.macro_cycles;
+    record.cyclesPerOp = resJson.candidate_cycles;
+    record.speedupPercent = resJson.speedup_percent;
+    record.parityAchieved = resJson.parity_achieved;
 
-  try {
-    const benchJson = JSON.parse(benchRes.output);
-    record.rps = benchJson.rps || 0;
-    record.p99LatencyUs = benchJson.latencyUs?.p99 || 0;
-  } catch {
-    const rpsMatch = benchRes.output.match(/Throughput:\s*([0-9,]+)\s*req\/s/i) || benchRes.output.match(/([0-9,]+)\s*req\/s/);
-    if (rpsMatch) record.rps = parseInt(rpsMatch[1].replace(/,/g, ''), 10);
-    const p99Match = benchRes.output.match(/p99:\s*([0-9,]+)\s*µs/i);
-    if (p99Match) record.p99LatencyUs = parseInt(p99Match[1].replace(/,/g, ''), 10);
-  }
+    console.log(`  [Gate 4 Results]`);
+    console.log(`    C++ (-O3) Baseline:      ${record.cppCyclesPerOp} cycles / op`);
+    console.log(`    Macro-ASM Reference:     ${ANSI.bold}${record.macroCyclesPerOp} cycles / op${ANSI.reset}`);
+    console.log(`    Candidate Assembly:      ${ANSI.bold}${record.cyclesPerOp} cycles / op${ANSI.reset} (Min: ${resJson.min_cycles} c)`);
+    console.log(`    Speedup vs C++:          ${ANSI.bold}+${record.speedupPercent}%${ANSI.reset}`);
+    console.log(`    Delta vs Macro-ASM:      ${ANSI.bold}${(record.cyclesPerOp - record.macroCyclesPerOp) >= 0 ? '+' : ''}${(record.cyclesPerOp - record.macroCyclesPerOp).toFixed(2)} cycles / op${ANSI.reset}`);
 
-  console.log(`  Throughput:  ${ANSI.bold}${record.rps} req/s${ANSI.reset} (Target: >= ${task.target.min_rps})`);
-  console.log(`  p99 Latency: ${record.p99LatencyUs} µs`);
+    if (record.parityAchieved) {
+      record.converged = true;
+      console.log(`\n${ANSI.green}${ANSI.bold}🎉 HARDWARE PARITY ACHIEVED! Candidate beats C++ by ${record.speedupPercent}% and matches Macro-ASM reference (<= 1.80 c/op)!${ANSI.reset}`);
+    } else {
+      record.converged = false;
+      record.feedback = `[Performance Gap Feedback]\nFunctional correctness is 100% OK.\n` +
+        `Current Speed: ${record.cyclesPerOp} cycles/op (Target: <= ${task.target.max_cycles_per_op} cycles/op, Macro-ASM Baseline: ${record.macroCyclesPerOp} c/op).\n` +
+        `Speedup vs C++: +${record.speedupPercent}% (Target: >= ${task.target.min_speedup_percent}%).\n` +
+        `Gap: Candidate is slower than target by ${(record.cyclesPerOp - task.target.max_cycles_per_op).toFixed(2)} cycles/op.\n` +
+        `Optimization guidance: Ensure operand stack pointer 'sp' and Top-of-Stack are cached in physical CPU registers, eliminate any memory round-trips in DISPATCH macro, and use direct-threaded jump table.`;
+    }
 
-  // Check Parity
-  const meetsSize = record.binarySizeBytes <= task.target.max_binary_size_bytes;
-  const meetsRps = record.rps >= task.target.min_rps;
-
-  if (record.testsPassed === task.target.tests_passed && meetsSize && meetsRps) {
-    record.converged = true;
-    console.log(`\n${ANSI.green}${ANSI.bold}🎉 HARDWARE PARITY ACHIEVED! Candidate met all constraints!${ANSI.reset}`);
-  } else {
-    record.converged = false;
-    record.feedback = `[Performance Gap Feedback]\nTests: ${record.testsPassed}/${record.testsTotal} OK.\n` +
-      `Current RPS: ${record.rps} (Target: ${task.target.min_rps}, Gap: ${task.target.min_rps - record.rps} req/s).\n` +
-      `Current Size: ${record.binarySizeBytes} B (Target: <= ${task.target.max_binary_size_bytes} B).\n` +
-      `Optimize AVX2 buffer pipeline copies, register caching, and eliminate any remaining memory accesses.`;
+  } catch (e) {
+    console.log(`  ${ANSI.red}✗ Gate 3 & 4 Failed: Runner crashed: ${evalRes.output.trim()}${ANSI.reset}`);
+    record.errors.push('RUNNER_CRASH: ' + evalRes.output.trim());
+    record.feedback = `[Execution Crash]\n${evalRes.output.trim()}`;
   }
 
   return record;
@@ -249,9 +304,13 @@ async function runHarness() {
   }
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const teleFile = path.resolve(`harness/telemetry/run_${taskId}_${modelName}_${timestamp}.json`);
+  const safeModel = modelName.replace(/[\/:]/g, '_');
+  const teleFile = path.resolve(`harness/telemetry/run_${taskId}_${safeModel}_${timestamp}.json`);
   fs.writeFileSync(teleFile, JSON.stringify(telemetry, null, 2), 'utf8');
   console.log(`\nTelemetry saved to: ${ANSI.cyan}${teleFile}${ANSI.reset}`);
+  console.log(`Total Token Cost: ${ANSI.bold}${telemetry.totalTokens.cost_rub.toFixed(2)} ₽${ANSI.reset} (${telemetry.totalTokens.input} in / ${telemetry.totalTokens.output} out)\n`);
+
+  process.exit(telemetry.converged ? 0 : 1);
 }
 
 runHarness().catch(err => {

@@ -14,6 +14,7 @@ const ANSI = {
   green: '\x1b[32m',
   yellow: '\x1b[33m',
   cyan: '\x1b[36m',
+  magenta: '\x1b[35m',
   gray: '\x1b[90m'
 };
 
@@ -37,24 +38,29 @@ for (const file of files) {
   try {
     const data = JSON.parse(fs.readFileSync(path.join(TELE_DIR, file), 'utf8'));
     const lastIter = data.iterations[data.iterations.length - 1] || {};
+    const macroRef = lastIter.macroCyclesPerOp || 1.56;
+    const candCycles = lastIter.cyclesPerOp || 0;
+    const deltaMacro = candCycles ? `${(candCycles - macroRef) >= 0 ? '+' : ''}${(candCycles - macroRef).toFixed(2)} c` : 'N/A';
+
     rows.push({
       file,
       task: data.task,
       model: data.model,
       converged: data.converged,
       iters: data.iterations.length,
-      tests: `${lastIter.testsPassed || 0}/${lastIter.testsTotal || 0}`,
-      size: lastIter.binarySizeBytes || 0,
-      rps: lastIter.rps || 0,
-      p99: lastIter.p99LatencyUs || 0
+      verified: lastIter.verified ? '100% OK' : 'FAILED',
+      cycles: candCycles ? `${candCycles} c` : 'N/A',
+      speedupCpp: lastIter.speedupPercent ? `+${lastIter.speedupPercent}%` : 'N/A',
+      deltaMacro: deltaMacro,
+      costRub: data.totalTokens?.cost_rub ? `${data.totalTokens.cost_rub.toFixed(2)} ₽` : '0 ₽'
     });
   } catch {}
 }
 
-console.log('| Model / Run | Task | Status | Iters | RFC Tests | Binary Size | Throughput (RPS) | p99 Latency |');
-console.log('| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |');
+console.log('| Model / Run | Task | Status | Iters | Correctness | Cycles / Op | vs C++ (-O3) | vs Macro-ASM Ref (1.56 c) | Cost (₽) |');
+console.log('| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |');
 for (const r of rows) {
   const status = r.converged ? `${ANSI.green}PARITY (WIN)${ANSI.reset}` : `${ANSI.red}FAILED${ANSI.reset}`;
-  console.log(`| ${r.model} | ${r.task} | ${status} | ${r.iters} | ${r.tests} | ${r.size} B | ${r.rps.toLocaleString()} req/s | ${r.p99} µs |`);
+  console.log(`| ${r.model} | ${r.task} | ${status} | ${r.iters} | ${r.verified} | ${r.cycles} | ${r.speedupCpp} | ${r.deltaMacro} | ${r.costRub} |`);
 }
 console.log('\n');

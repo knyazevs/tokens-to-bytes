@@ -1,27 +1,23 @@
 // ============================================================================
-// Macro-Assembly (GAS + CPP) implementation of Stack VM Bytecode Interpreter
-// Synthesized for LLM Context Compression with Zero Abstraction Penalty
+// Macro-ASM Direct Threading Stack VM Reference
+// Implements 12 opcodes with zero-latency computed goto and direct register caching
 // ============================================================================
 
 .intel_syntax noprefix
 .text
 
 // ----------------------------------------------------------------------------
-// Core Architecture Macros
+// Core Direct Threading Dispatch Macro
 // ----------------------------------------------------------------------------
-
-// Direct Threaded Dispatch Macro: fetches next opcode and jumps directly to its handler
 #define DISPATCH \
-    cmp r13, rdi; \
-    jae .L_exit; \
     mov edx, dword ptr [rsi + r13*4]; \
     inc r13; \
     movzx eax, dl; \
-    cmp eax, 11; \
-    ja .L_exit; \
     jmp qword ptr [r10 + rax*8]
 
-// Binary Arithmetic Operations: reads top-of-stack, executes instruction, shrinks stack
+// ----------------------------------------------------------------------------
+// Binary Operation Template Macro
+// ----------------------------------------------------------------------------
 #define BINARY_OP(name, inst) \
     .p2align 4; \
     .L_OP_##name: \
@@ -48,118 +44,126 @@ vm_interpret_macro:
 
     // Setup working environment
     mov rsi, rcx                     // rsi = code pointer
-    mov rdi, rdx                     // rdi = code_len
-    mov r14, r8                      // r14 = state pointer
+    mov rdi, rdx                     // rdi = code length
+    mov r12, r8                      // r12 = VMState pointer
 
-    lea r12, [r14 + 1032]            // r12 = &state->locals[0]
-    lea r15, [r14 + 8]               // r15 = &state->values[0]
+    mov r13d, dword ptr [r12 + 4]    // r13 = pc
+    mov eax, dword ptr [r12]         // eax = sp
+    lea r11, [r12 + 8 + rax*4]       // r11 = &values[sp] (stack top pointer)
 
-    movsxd r13, dword ptr [r14 + 4]  // r13 = pc
-    movsxd rax, dword ptr [r14]      // rax = sp
-    lea r11, [r15 + rax*4]           // r11 = &values[sp] (TOS pointer)
+    lea r14, [r12 + 1032]            // r14 = &locals[0]
+    lea r10, [rip + dispatch_table]  // r10 = dispatch table base
 
-    lea r10, [rip + .L_dispatch_table]
-
-    // Initial dispatch
+    // Enter execution loop
     DISPATCH
 
-    .p2align 4
-.L_OP_HALT:
-    jmp .L_exit
+    // ------------------------------------------------------------------------
+    // Opcode Handlers
+    // ------------------------------------------------------------------------
 
     .p2align 4
-.L_OP_PUSH:
-    sar edx, 8
-    mov dword ptr [r11], edx
-    add r11, 4
-    DISPATCH
+    .L_OP_HALT:
+        jmp .L_exit
 
     .p2align 4
-.L_OP_POP:
-    sub r11, 4
-    DISPATCH
+    .L_OP_PUSH:
+        sar edx, 8                   // edx = sign-extended immediate
+        mov dword ptr [r11], edx
+        add r11, 4
+        DISPATCH
 
     .p2align 4
-.L_OP_DUP:
-    mov eax, dword ptr [r11 - 4]
-    mov dword ptr [r11], eax
-    add r11, 4
-    DISPATCH
+    .L_OP_POP:
+        sub r11, 4
+        DISPATCH
 
     .p2align 4
-.L_OP_SWAP:
-    mov eax, dword ptr [r11 - 4]
-    mov ebx, dword ptr [r11 - 8]
-    mov dword ptr [r11 - 4], ebx
-    mov dword ptr [r11 - 8], eax
-    DISPATCH
+    .L_OP_DUP:
+        mov eax, dword ptr [r11 - 4]
+        mov dword ptr [r11], eax
+        add r11, 4
+        DISPATCH
 
-    // Binary operations defined via macro
+    .p2align 4
+    .L_OP_SWAP:
+        mov eax, dword ptr [r11 - 4]
+        mov edx, dword ptr [r11 - 8]
+        mov dword ptr [r11 - 4], edx
+        mov dword ptr [r11 - 8], eax
+        DISPATCH
+
     BINARY_OP(ADD, add)
     BINARY_OP(SUB, sub)
+    .p2align 4
+    .L_OP_MUL:
+        mov eax, dword ptr [r11 - 8]
+        imul eax, dword ptr [r11 - 4]
+        mov dword ptr [r11 - 8], eax
+        sub r11, 4
+        DISPATCH
 
     .p2align 4
-.L_OP_MUL:
-    mov eax, dword ptr [r11 - 8]
-    imul eax, dword ptr [r11 - 4]
-    mov dword ptr [r11 - 8], eax
-    sub r11, 4
-    DISPATCH
+    .L_OP_LOADL:
+        sar edx, 8
+        mov eax, dword ptr [r14 + rdx*4]
+        mov dword ptr [r11], eax
+        add r11, 4
+        DISPATCH
 
     .p2align 4
-.L_OP_LOADL:
-    movzx eax, dh
-    and eax, 0x0F
-    mov eax, dword ptr [r12 + rax*4]
-    mov dword ptr [r11], eax
-    add r11, 4
-    DISPATCH
+    .L_OP_STOREL:
+        sar edx, 8
+        sub r11, 4
+        mov eax, dword ptr [r11]
+        mov dword ptr [r14 + rdx*4], eax
+        DISPATCH
 
     .p2align 4
-.L_OP_STOREL:
-    sub r11, 4
-    mov eax, dword ptr [r11]
-    movzx ebx, dh
-    and ebx, 0x0F
-    mov dword ptr [r12 + rbx*4], eax
-    DISPATCH
+    .L_OP_JNZ:
+        sub r11, 4
+        mov eax, dword ptr [r11]
+        test eax, eax
+        jz .L_jnz_fallthrough
+        sar edx, 8
+        mov r13d, edx
+    .L_jnz_fallthrough:
+        DISPATCH
 
     .p2align 4
-.L_OP_JNZ:
-    sub r11, 4
-    cmp dword ptr [r11], 0
-    jz .L_jnz_skip
-    shr edx, 8
-    movzx r13d, dx
-.L_jnz_skip:
-    DISPATCH
+    .L_OP_JMP:
+        sar edx, 8
+        mov r13d, edx
+        DISPATCH
 
+    // ------------------------------------------------------------------------
+    // Exit & Epilogue
+    // ------------------------------------------------------------------------
     .p2align 4
-.L_OP_JMP:
-    shr edx, 8
-    movzx r13d, dx
-    DISPATCH
+    .L_exit:
+        // Sync VMState (pc and sp)
+        mov dword ptr [r12 + 4], r13d
+        lea rax, [r12 + 8]
+        sub r11, rax
+        shr r11, 2
+        mov dword ptr [r12], r11d
 
-.L_exit:
-    // Epilogue: sync state back to struct
-    mov dword ptr [r14 + 4], r13d
-    sub r11, r15
-    sar r11, 2
-    mov dword ptr [r14], r11d
+        // Windows x64 ABI Epilogue
+        add rsp, 40
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop rdi
+        pop rsi
+        pop rbx
+        ret
 
-    add rsp, 40
-    pop r15
-    pop r14
-    pop r13
-    pop r12
-    pop rdi
-    pop rsi
-    pop rbx
-    ret
-
+// ----------------------------------------------------------------------------
+// Computed GOTO Dispatch Table
+// ----------------------------------------------------------------------------
 .section .rdata,"dr"
 .p2align 3
-.L_dispatch_table:
+dispatch_table:
     .quad .L_OP_HALT
     .quad .L_OP_PUSH
     .quad .L_OP_POP
