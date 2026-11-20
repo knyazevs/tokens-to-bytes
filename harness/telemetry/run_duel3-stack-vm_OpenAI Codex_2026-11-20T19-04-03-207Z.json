@@ -1,0 +1,43 @@
+{
+  "task": "duel3-stack-vm",
+  "model": "OpenAI Codex",
+  "startTime": "2026-11-20T19:04:01.927Z",
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-11-20T19:04:01.929Z",
+      "linterPassed": true,
+      "buildPassed": true,
+      "verified": true,
+      "cyclesPerOp": 1.74,
+      "macroCyclesPerOp": 1.56,
+      "cppCyclesPerOp": 3.65,
+      "speedupPercent": 52.3,
+      "parityAchieved": true,
+      "errors": [],
+      "feedback": "",
+      "converged": true
+    }
+  ],
+  "converged": true,
+  "totalTokens": {
+    "input": 0,
+    "output": 0,
+    "cost_rub": 0
+  },
+  "finalMetrics": {
+    "iteration": 1,
+    "timestamp": "2026-11-20T19:04:01.929Z",
+    "linterPassed": true,
+    "buildPassed": true,
+    "verified": true,
+    "cyclesPerOp": 1.74,
+    "macroCyclesPerOp": 1.56,
+    "cppCyclesPerOp": 3.65,
+    "speedupPercent": 52.3,
+    "parityAchieved": true,
+    "errors": [],
+    "feedback": "",
+    "converged": true
+  }
+}
