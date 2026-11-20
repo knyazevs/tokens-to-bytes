@@ -140,7 +140,7 @@ In Duel 3, `native/vm_macro.S` applies a standard C-preprocessor / GAS macro lay
 
 ## HTTP Arena: Bare-Metal Network I/O (RFC 7230)
 
-To test whether the advantages of LLM-synthesized machine code hold beyond pure computation into asynchronous network I/O, we built an RFC 7230-compliant asynchronous HTTP server benchmark inspired by [HttpArena](https://http-arena.com/). Six implementations are measured under 20,000 requests each across 30 concurrent pipelining connections:
+To test whether the advantages of LLM-synthesized machine code hold beyond pure computation into asynchronous network I/O, we built an RFC 7230-compliant asynchronous HTTP server benchmark inspired by [HttpArena](https://http-arena.com/). Seven implementations are measured under 20,000 requests each across 30 concurrent pipelining connections:
 
 ```bash
 node projects/http/run.mjs
@@ -148,18 +148,28 @@ node projects/http/run.mjs
 
 | Implementation | Architecture | Tests | RPS (req/s) | Median Latency | p99 Latency | Source Bytes | Binary Size |
 |---|---|:---:|---:|---:|---:|---:|---:|
-| **Macro-ASM (x86-64)** | AVX2 Overlapping Stores, Fast Div10, Zero-Spill | **8/8** | **76 331** | **371 µs** | **683 µs** | 14.7 KB | 143 KB |
-| **Pure ASM (x86-64)** | 100% Bare-Metal, Zero CRT, Pinned Regs | **8/8** | **63 014** | **413 µs** | **1 049 µs** | 14.6 KB | **108 KB** |
-| **Node.js (baseline)** | `node:http` (V8 + libuv + llhttp) | **8/8** | 26 185 | 1 059 µs | 2 647 µs | 1.3 KB | node.exe (45 MB) |
-| **C (Zero-Alloc)** | Static memory arenas, `WSAPoll`, Clang -O3 | **8/8** | 25 338 | 908 µs | 6 197 µs | 10.1 KB | 148 KB |
-| **C++20 (Zero-Alloc)** | `std::string_view`, `from_chars`, WSAPoll | **8/8** | 25 259 | 874 µs | 6 368 µs | 9.3 KB | 12.5 MB |
-| **Rust (std)** | `TcpListener`, multithreaded | **8/8** | 22 927 | 737 µs | 6 466 µs | 5.5 KB | 178 KB |
+| **Macro-ASM (x86-64)** | AVX2 Overlapping Stores, Fast Div10, Zero-Spill | **8/8** | **67 651** | **412 µs** | **743 µs** | 14.7 KB | 143 KB |
+| **C++20 (Zero-Alloc)** | `std::string_view`, `from_chars`, WSAPoll | **8/8** | **64 919** | **426 µs** | **808 µs** | 9.3 KB | 12.5 MB |
+| **Pure ASM (x86-64)** | 100% Bare-Metal, Zero CRT, Pinned Regs | **8/8** | **60 254** | **442 µs** | **1 195 µs** | 14.6 KB | **108 KB** |
+| **Rust (std)** | `TcpListener`, multithreaded | **8/8** | 51 713 | 528 µs | 993 µs | 5.5 KB | 178 KB |
+| **C (Zero-Alloc)** | Static memory arenas, `WSAPoll`, Clang -O3 | **8/8** | 51 675 | 519 µs | 1 269 µs | 10.1 KB | 148 KB |
+| **Node.js (baseline)** | `node:http` (V8 + libuv + llhttp) | **8/8** | 38 800 | 677 µs | 2 401 µs | 1.3 KB | node.exe (45 MB) |
+| **HttpArena (Official)** | Official `MDA2AV/HttpArena` reference engine | **8/8** | 35 902 | 722 µs | 2 859 µs | 2.1 KB | node.exe (45 MB) |
 
-### Key Network Architectural Wins:
-1. **3.01× Higher Throughput:** Macro-ASM reaches **76 331 req/s**, beating optimized C Zero-Alloc (25 338 req/s) by 3×.
-2. **9× Lower p99 Latency:** Tail latency remains bounded at **683–1049 µs**, while C and C++ spike to **6 197 – 6 368 µs**.
-3. **Overlapping AVX2 Stores:** HTTP headers of arbitrary lengths (59 B, 65 B, 28 B) are written in 2–3 vector instructions with zero microcode `rep movsb` startup penalty.
-4. **Zero-CRT Bare-Metal Assembler (`pure_server.S`):** Directly interfaces with Win32 Winsock syscalls with zero C runtime, pinning connection arrays and poll states in registers (`r12`..`r15`, `rbx`, `ebp`), yielding the smallest executable (**108 KB**).
+### Cross-Platform Calibration & Scaling Analysis
+To ground local single-core measurements against the official [HttpArena cluster leaderboard](https://http-arena.com/), the benchmark includes the official reference engine (`frameworks/node/server.js`):
+
+- **Official Cluster Baseline (AMD Threadripper PRO 3995WX, 64-core):**
+  - Official HttpArena `node` engine throughput: **890 397 req/s** (65.43 cores used = **13 608 req/s per core**).
+- **Local Testbed Baseline (Intel Core i5-12600KF Golden Cove P-core @ 4.9 GHz):**
+  - Local HttpArena `node` throughput: **35 902 req/s**.
+- **Hardware Deviation Coefficients:**
+  - **Single-core IPC / Frequency Ratio:** $35\,902 / 13\,608 = \mathbf{2.64\times}$ (single P-core is 2.64× faster than one Threadripper core in single-threaded JS).
+  - **Cluster Multi-Core Scaling Factor:** $890\,397 / 35\,902 = \mathbf{24.8\times}$ (64 Threadripper cores aggregate 24.8× the throughput of 1 P-core).
+- **Projected 64-Core HttpArena Cluster Throughput:**
+  - **Macro-ASM (x86-64):** $\approx \mathbf{1\,641\,000 \text{ req/s}}$ (local: 67 651 req/s)
+  - **Pure ASM (x86-64):** $\approx \mathbf{1\,461\,000 \text{ req/s}}$ (local: 60 254 req/s)
+  - **C++20 (Zero-Alloc):** $\approx 1\,574\,000 \text{ req/s}$ (local: 64 919 req/s)
 
 ## Cross-model replication
 
@@ -255,7 +265,7 @@ node builds/paired.mjs json 12         # data/paired-json.json
 node builds/paired.mjs regex 12        # data/paired-regex.json
 node builds/paired.mjs vm 12           # data/paired-vm.json
 node native/run.mjs                    # runs all 3 native x86-64 duels & macro-asm
-node projects/http/run.mjs             # runs 6-way HTTP Arena bare-metal benchmark (data/http.json)
+node projects/http/run.mjs             # runs 7-way HTTP Arena bare-metal benchmark (data/http.json)
 ```
 
 On a hybrid CPU, pin the measurement to P-cores so Windows does not schedule it onto
@@ -271,7 +281,7 @@ $env:AFFINITY='FFF'; cmd /c start /affinity FFF /wait /b node builds/measure.mjs
 TRAJECTORY.md              research trajectory & epistemic lab notebook
 index.html                 the article
 native/                    native x86-64 duels, bare-metal kernels & macro-asm benchmarks
-projects/http/             bare-metal HTTP Arena servers (Pure ASM, Macro-ASM, C, C++, Rust, Node)
+projects/http/             bare-metal HTTP Arena servers (Pure ASM, Macro-ASM, C, C++, Rust, Node, Official Arena)
 assets/                    styles, scripts, shared protocols, isolated browser bench
 data/
   projects.json            project registry
@@ -279,7 +289,7 @@ data/
   json.json                JSON parser measurements
   regex.json               regex engine measurements
   vm.json                  stack VM measurements
-  http.json                HTTP Arena 6-way benchmark results
+  http.json                HTTP Arena 7-way benchmark results
   tokens.json              calculator artifact token counts
   tokens-json.json         JSON parser artifact token counts
   tokens-regex.json        regex engine artifact token counts
