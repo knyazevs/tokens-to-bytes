@@ -17,6 +17,7 @@
     "build:regex": "node builds/build.mjs regex",
     "build:vm": "node builds/build.mjs vm",
     "check:vm-asm": "node builds/check-vm-asm.mjs",
+    "lint:asm": "node builds/lint-asm.mjs",
     "all": "npm run tokens && npm run measure"
   },
   "devDependencies": {

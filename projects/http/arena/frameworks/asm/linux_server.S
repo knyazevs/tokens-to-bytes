@@ -154,9 +154,13 @@ events:
 /* Fast division by 10 without clobbering rbx/r10 */
 .macro FAST_DIV10 reg
     mov eax, \reg
-    xor edx, edx
-    mov r11d, 10
-    div r11d
+    mov edx, eax
+    mov ecx, 0xcccccccd
+    imul rax, rcx
+    shr rax, 35
+    lea ecx, [rax + rax*4]
+    add ecx, ecx
+    sub edx, ecx
     mov \reg, eax
 .endm
 
@@ -558,9 +562,7 @@ _start:
 
     /* Content-Length number */
     mov eax, edx
-    xor edx, edx
-    mov r11d, 10
-    div r11d
+    FAST_DIV10 eax
     test al, al
     jz .L_b11_cl_1
     add al, '0'
@@ -643,9 +645,7 @@ _start:
 
     /* Write Content-Length */
     mov eax, edx
-    xor edx, edx
-    mov r11d, 10
-    div r11d
+    FAST_DIV10 eax
     test al, al
     jz .L_json_cl_1
     add al, '0'

@@ -190,11 +190,16 @@ asm_handle_request:
     jmp .L_sum_ready
 
 .L_sum_digits:
-    xor edx, edx
-    div r11d
-    add dl, '0'
+    mov edi, eax
+    mov r11, 0xcccccccd
+    imul rax, r11
+    shr rax, 35
+    lea edx, [rax + rax*4]
+    add edx, edx
+    sub edi, edx
+    add dil, '0'
     dec r10
-    mov byte ptr [r10], dl
+    mov byte ptr [r10], dil
     inc ecx
     test eax, eax
     jnz .L_sum_digits
@@ -207,13 +212,17 @@ asm_handle_request:
     cmp ecx, 10
     jl .L_cl_single
     mov eax, ecx
-    xor edx, edx
-    mov r11d, 10
-    div r11d
+    mov edi, eax
+    mov r11, 0xcccccccd
+    imul rax, r11
+    shr rax, 35
+    lea edx, [rax + rax*4]
+    add edx, edx
+    sub edi, edx
     add al, '0'
-    add dl, '0'
+    add dil, '0'
     mov byte ptr [r8], al
-    mov byte ptr [r8 + 1], dl
+    mov byte ptr [r8 + 1], dil
     add r8, 2
     jmp .L_write_crlf
 
@@ -260,11 +269,16 @@ asm_handle_request:
     jmp .L_json_assemble
 
 .L_json_id_loop:
-    xor edx, edx
-    div r11d
-    add dl, '0'
+    mov edi, eax
+    mov r11, 0xcccccccd
+    imul rax, r11
+    shr rax, 35
+    lea edx, [rax + rax*4]
+    add edx, edx
+    sub edi, edx
+    add dil, '0'
     dec r10
-    mov byte ptr [r10], dl
+    mov byte ptr [r10], dil
     inc ecx
     test eax, eax
     jnz .L_json_id_loop
@@ -296,13 +310,17 @@ asm_handle_request:
 
     /* Write body length (always 2 digits: 30..35) */
     mov eax, ecx
-    xor edx, edx
-    mov r11d, 10
-    div r11d
+    mov edi, eax
+    mov r11, 0xcccccccd
+    imul rax, r11
+    shr rax, 35
+    lea edx, [rax + rax*4]
+    add edx, edx
+    sub edi, edx
     add al, '0'
-    add dl, '0'
+    add dil, '0'
     mov byte ptr [r8], al
-    mov byte ptr [r8 + 1], dl
+    mov byte ptr [r8 + 1], dil
     add r8, 2
 
     COPY_28_CRLF_FAST
