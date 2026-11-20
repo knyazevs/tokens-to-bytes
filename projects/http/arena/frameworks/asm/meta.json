@@ -1,0 +1,14 @@
+{
+  "name": "asm-baremetal",
+  "display_name": "Pure Assembly (x86-64 / AVX2 / epoll)",
+  "language": "asm",
+  "type": "engine",
+  "tests": [
+    "baseline",
+    "json"
+  ],
+  "spec": [
+    "h1"
+  ],
+  "resilience": true
+}
