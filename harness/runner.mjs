@@ -99,10 +99,12 @@ function callPolzaApi(model, messages, maxTokens = 65536) {
       temperature: 0.2
     });
 
+    const agent = new https.Agent({ keepAlive: true, timeout: 900000 });
     const req = https.request({
       hostname: 'api.polza.ai',
       path: '/v1/chat/completions',
       method: 'POST',
+      agent,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
@@ -123,6 +125,10 @@ function callPolzaApi(model, messages, maxTokens = 65536) {
           reject(new Error(`Failed to parse API response: ${data}`));
         }
       });
+    });
+
+    req.setTimeout(900000, () => {
+      req.destroy(new Error('Request timed out after 15 minutes'));
     });
 
     req.on('error', reject);
@@ -305,7 +311,7 @@ async function runHarness() {
 
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const safeModel = modelName.replace(/[\/:]/g, '_');
-  const teleFile = path.resolve(`harness/telemetry/run_${taskId}_${safeModel}_${timestamp}.json`);
+  const teleFile = path.resolve(`harness/telemetry/run_${taskId}_${safeModel}_macro-assisted_${timestamp}.json`);
   fs.writeFileSync(teleFile, JSON.stringify(telemetry, null, 2), 'utf8');
   console.log(`\nTelemetry saved to: ${ANSI.cyan}${teleFile}${ANSI.reset}`);
   console.log(`Total Token Cost: ${ANSI.bold}${telemetry.totalTokens.cost_rub.toFixed(2)} ₽${ANSI.reset} (${telemetry.totalTokens.input} in / ${telemetry.totalTokens.output} out)\n`);

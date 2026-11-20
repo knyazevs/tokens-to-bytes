@@ -2,7 +2,7 @@
 
 You are tasked with engineering a world-class, ultra-fast bytecode virtual machine interpreter in x86-64 assembly (`.s` / `.S`) targeting Windows x64 ABI.
 
-Your implementation will compete directly in real-time hardware cycle benchmarking against Clang -O3 compiled C++ on a physical CPU core.
+Your implementation will compete directly in real-time hardware cycle benchmarking against Clang -O3 compiled C++ and a human Macro-ASM baseline on a physical CPU core.
 
 ---
 
@@ -51,18 +51,43 @@ Each instruction is a 32-bit integer:
 
 ---
 
-## 3. Mandatory Hardware Optimization Invariants (Macro-ASM Skill)
+## 3. Macro-ASM Framework & Macro Library
 
-Standard compiled C++ (`switch` loop) runs at **3.66 cycles per opcode**. Your goal is **<= 1.80 cycles per opcode** (> 50% speedup).
+Standard compiled C++ (`switch` loop) runs at **3.66 cycles per opcode**.
+The human Macro-ASM reference runs at **1.56 cycles per opcode**.
+Your goal is **<= 1.80 cycles per opcode** (> 50% speedup).
 
-To achieve this hardware parity:
-1. **Direct Threading (Computed GOTO):** Do NOT use a `switch` jump or binary search. Build a direct dispatch table of 12 code pointers (`.quad .L_OP_0, .L_OP_1, ...`) and dispatch with `jmp [table + rax*8]`.
-2. **Register Pinning (Zero Memory Access in Loop):**
-   - Pin the instruction pointer (PC / offset) in a dedicated physical register (e.g. `r13`).
-   - Pin the operand stack pointer/address in a dedicated register (e.g. `r11` pointing to `&values[sp]`).
-   - Pin the dispatch table base address in a register (e.g. `r10`).
-3. **Macro-ASM Hygiene:**
-   - Define a `DISPATCH` macro to fetch next instruction and jump in 3-4 instructions without function calls.
+To achieve maximum performance without boilerplate errors, you are provided with and encouraged to use the **Macro-ASM** abstraction framework (C-preprocessor `#define` macros or GAS `.macro`):
+
+### Core Direct Threading Dispatch Macro:
+```gas
+#define DISPATCH \
+    mov edx, dword ptr [rsi + r13*4]; \
+    inc r13; \
+    movzx eax, dl; \
+    jmp qword ptr [r10 + rax*8]
+```
+
+### Binary Arithmetic Template Macro:
+```gas
+#define BINARY_OP(name, inst) \
+    .p2align 4; \
+    .L_OP_##name: \
+        mov eax, dword ptr [r11 - 4]; \
+        inst dword ptr [r11 - 8], eax; \
+        sub r11, 4; \
+        DISPATCH
+```
+
+### Recommended Register Pinning:
+- `rsi` = code pointer (`code`)
+- `r12` = `VMState*`
+- `r13` = program counter (`pc`, instruction index)
+- `r11` = operand stack top pointer (`&values[sp]`)
+- `r14` = locals array base (`&locals[0]`)
+- `r10` = dispatch table base address (`dispatch_table`)
+
+You may adapt, extend, or refine these macros (e.g. adding Top-of-Stack register caching or branch-free decoding) to beat the 1.56 c/op baseline.
 
 ---
 

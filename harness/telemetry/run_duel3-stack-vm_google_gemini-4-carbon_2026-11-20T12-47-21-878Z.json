@@ -1,6 +1,6 @@
 {
   "task": "duel3-stack-vm",
-  "model": "google/gemini-4-carbon",
+  "model": "google/gemini-4-carbon (Pure ASM Zero-Shot)",
   "startTime": "2026-11-20T12:35:10.000Z",
   "durationSeconds": 501.8,
   "iterations": [

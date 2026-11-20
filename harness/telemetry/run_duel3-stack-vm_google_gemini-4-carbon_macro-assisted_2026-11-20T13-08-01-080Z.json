@@ -1,0 +1,43 @@
+{
+  "task": "duel3-stack-vm",
+  "model": "google/gemini-4-carbon (Macro-ASM Assisted)",
+  "startTime": "2026-11-20T12:58:32.074Z",
+  "iterations": [
+    {
+      "iteration": 1,
+      "timestamp": "2026-11-20T13:07:59.847Z",
+      "linterPassed": true,
+      "buildPassed": true,
+      "verified": true,
+      "cyclesPerOp": 1.73,
+      "macroCyclesPerOp": 1.56,
+      "cppCyclesPerOp": 3.66,
+      "speedupPercent": 52.8,
+      "parityAchieved": true,
+      "errors": [],
+      "feedback": "",
+      "converged": true
+    }
+  ],
+  "converged": true,
+  "totalTokens": {
+    "input": 3197,
+    "output": 36242,
+    "cost_rub": 42.99313186
+  },
+  "finalMetrics": {
+    "iteration": 1,
+    "timestamp": "2026-11-20T13:07:59.847Z",
+    "linterPassed": true,
+    "buildPassed": true,
+    "verified": true,
+    "cyclesPerOp": 1.73,
+    "macroCyclesPerOp": 1.56,
+    "cppCyclesPerOp": 3.66,
+    "speedupPercent": 52.8,
+    "parityAchieved": true,
+    "errors": [],
+    "feedback": "",
+    "converged": true
+  }
+}
