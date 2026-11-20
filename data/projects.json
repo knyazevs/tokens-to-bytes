@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated": "2026-11-19",
+  "updated": "2026-11-20",
   "projects": [
     {
       "slug": "calculator",
@@ -45,6 +45,17 @@
       "bench": "projects/vm/bench.html",
       "source": "projects/vm",
       "results": "data/vm.json"
+    },
+    {
+      "slug": "http",
+      "name": "HTTP Arena Server",
+      "status": "live",
+      "summary": "Асинхронный HTTP/1.1 сервер по стандарту HttpArena (RFC 7230, Keep-Alive, Pipelining, baseline и json). Сравнение пяти реализаций: Macro-ASM (x86-64), C (Zero-Alloc), C++20, Rust и Node.js.",
+      "tags": ["network i/o", "rfc 7230", "keep-alive", "pipelining", "5 сборок"],
+      "demo": "projects/http",
+      "bench": "projects/http/run.mjs",
+      "source": "projects/http",
+      "results": "data/http.json"
     }
   ]
 }

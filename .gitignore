@@ -8,3 +8,4 @@ builds/rust-vm/target/
 *.exe
 .DS_Store
 Thumbs.db
+*.pdb

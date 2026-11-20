@@ -1,0 +1,52 @@
+[
+  {
+    "id": "macro-asm",
+    "name": "Macro-ASM (x86-64)",
+    "tests": "8/8",
+    "rps": 64416,
+    "medianUs": 418,
+    "p99Us": 1011,
+    "sourceBytes": 14079,
+    "exeSize": 146432
+  },
+  {
+    "id": "c",
+    "name": "C (Zero-Alloc)",
+    "tests": "8/8",
+    "rps": 67347,
+    "medianUs": 406,
+    "p99Us": 772,
+    "sourceBytes": 10101,
+    "exeSize": 151040
+  },
+  {
+    "id": "cpp",
+    "name": "C++20 (Zero-Alloc)",
+    "tests": "8/8",
+    "rps": 25483,
+    "medianUs": 837,
+    "p99Us": 6048,
+    "sourceBytes": 9345,
+    "exeSize": 12756992
+  },
+  {
+    "id": "rust",
+    "name": "Rust (std)",
+    "tests": "8/8",
+    "rps": 26212,
+    "medianUs": 892,
+    "p99Us": 4316,
+    "sourceBytes": 5523,
+    "exeSize": 182272
+  },
+  {
+    "id": "node",
+    "name": "Node.js (baseline)",
+    "tests": "8/8",
+    "rps": 24775,
+    "medianUs": 1082,
+    "p99Us": 2839,
+    "sourceBytes": 1253,
+    "exeSize": 0
+  }
+]
