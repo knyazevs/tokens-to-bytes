@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <immintrin.h>
 
 #define MAX_WORKERS 16
 #define CONNS_PER_WORKER 256
@@ -34,17 +35,32 @@ typedef struct {
 static Worker workers[MAX_WORKERS];
 static int num_workers = 6;
 
-/* Macro-ASM kernel */
+/* Macro-ASM kernel: returns new out_len in eax directly */
 extern void asm_handle_request(const char *req, int req_len, char *out_buf, int *out_len);
 
 static inline char *fast_find_crlf_crlf(char *buf, int len) {
     if (len < 4) return NULL;
-    for (int j = 0; j <= len - 4; j++) {
-        if (*(unsigned int*)(buf + j) == 0x0a0d0a0d) {
+    int limit = len - 4;
+    for (int j = 0; j <= limit; j++) {
+        if (*(const unsigned int*)(buf + j) == 0x0a0d0a0d) {
             return buf + j;
         }
     }
     return NULL;
+}
+
+static inline void fast_shift_buf(char *dst, const char *src, int len) {
+    if (len <= 32) {
+        __m256i v = _mm256_loadu_si256((const __m256i*)src);
+        _mm256_storeu_si256((__m256i*)dst, v);
+    } else if (len <= 64) {
+        __m256i v0 = _mm256_loadu_si256((const __m256i*)src);
+        __m256i v1 = _mm256_loadu_si256((const __m256i*)(src + len - 32));
+        _mm256_storeu_si256((__m256i*)dst, v0);
+        _mm256_storeu_si256((__m256i*)(dst + len - 32), v1);
+    } else {
+        memmove(dst, src, len);
+    }
 }
 
 static void worker_close_conn(Worker *w, int idx) {
@@ -98,6 +114,7 @@ DWORD WINAPI worker_thread(LPVOID param) {
             continue;
         }
 
+        // Setup poll fds
         for (int i = 0; i < w->num_fds; i++) {
             w->poll_fds[i].events = POLLIN;
             if (w->conns[i].out_len > w->conns[i].out_sent) {
@@ -105,7 +122,7 @@ DWORD WINAPI worker_thread(LPVOID param) {
             }
         }
 
-        int ready = WSAPoll(w->poll_fds, w->num_fds, 5);
+        int ready = WSAPoll(w->poll_fds, w->num_fds, 1);
         if (ready <= 0) continue;
 
         for (int i = 0; i < w->num_fds; i++) {
@@ -158,7 +175,7 @@ DWORD WINAPI worker_thread(LPVOID param) {
 
                             int rest = w->conns[i].in_len - req_len;
                             if (rest > 0) {
-                                memmove(w->conns[i].in_buf, w->conns[i].in_buf + req_len, rest);
+                                fast_shift_buf(w->conns[i].in_buf, w->conns[i].in_buf + req_len, rest);
                                 w->conns[i].in_len = rest;
                                 w->conns[i].in_buf[rest] = '\0';
                             } else {
@@ -196,11 +213,6 @@ int main(int argc, char **argv) {
     const char *env_port = getenv("PORT");
     if (env_port) port = atoi(env_port);
 
-    const char *env_workers = getenv("WORKERS");
-    if (env_workers) num_workers = atoi(env_workers);
-    if (num_workers < 1) num_workers = 1;
-    if (num_workers > MAX_WORKERS) num_workers = MAX_WORKERS;
-
     WSADATA wsa;
     if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) return 1;
 
@@ -217,37 +229,46 @@ int main(int argc, char **argv) {
     sin.sin_port = htons((u_short)port);
 
     if (bind(listener, (struct sockaddr*)&sin, sizeof(sin)) != 0) return 1;
-    if (listen(listener, 1024) != 0) return 1;
+    if (listen(listener, 4096) != 0) return 1;
 
-    // Initialize and start worker threads
-    for (int w = 0; w < num_workers; w++) {
-        workers[w].worker_id = w;
-        workers[w].num_fds = 0;
-        workers[w].q_head = 0;
-        workers[w].q_tail = 0;
-        workers[w].event = CreateEvent(NULL, FALSE, FALSE, NULL);
-        for (int c = 0; c < CONNS_PER_WORKER; c++) {
-            workers[w].conns[c].fd = INVALID_SOCKET;
-        }
-        CreateThread(NULL, 0, worker_thread, &workers[w], 0, NULL);
+    u_long mode = 1;
+    ioctlsocket(listener, FIONBIO, &mode);
+
+    // Initialize worker threads
+    for (int i = 0; i < num_workers; i++) {
+        workers[i].worker_id = i;
+        workers[i].q_head = 0;
+        workers[i].q_tail = 0;
+        workers[i].num_fds = 0;
+        workers[i].event = CreateEvent(NULL, FALSE, FALSE, NULL);
+        CreateThread(NULL, 0, worker_thread, &workers[i], 0, NULL);
     }
 
-    printf("Macro-ASM Multi-Core Server (%d workers) listening on port %d...\n", num_workers, port);
+    printf("Macro-ASM Multi-Core Server listening on port %d with %d P-core workers...\n", port, num_workers);
     fflush(stdout);
 
-    int round_robin = 0;
+    int next_worker = 0;
+    WSAPOLLFD l_pfd = { .fd = listener, .events = POLLIN, .revents = 0 };
+
     while (1) {
-        SOCKET client = accept(listener, NULL, NULL);
-        if (client == INVALID_SOCKET) continue;
+        int ready = WSAPoll(&l_pfd, 1, 100);
+        if (ready <= 0) continue;
 
-        int target = round_robin++ % num_workers;
-        Worker *w = &workers[target];
+        if (l_pfd.revents & POLLIN) {
+            while (1) {
+                SOCKET client = accept(listener, NULL, NULL);
+                if (client == INVALID_SOCKET) break;
 
-        long head = w->q_head;
-        w->queue[head % QUEUE_SIZE] = client;
-        MemoryBarrier();
-        w->q_head = head + 1;
-        SetEvent(w->event);
+                Worker *w = &workers[next_worker];
+                next_worker = (next_worker + 1) % num_workers;
+
+                long head = w->q_head;
+                w->queue[head % QUEUE_SIZE] = client;
+                MemoryBarrier();
+                w->q_head = head + 1;
+                SetEvent(w->event);
+            }
+        }
     }
 
     WSACleanup();
